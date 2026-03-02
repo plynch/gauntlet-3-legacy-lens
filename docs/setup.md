@@ -32,9 +32,9 @@ If you prefer not to use Docker:
    - keep it private (no public domain)
    - add a Railway Volume (at least 1GB) for persistence
 3. Set API env vars:
-   - `LEGACY_QDRANT_URL` to private Railway qdrant URL
-   - `LEGACY_ALLOWED_ORIGINS` to `["https://<web-service>.up.railway.app"]`
-   - `LEGACY_OPENAI_API_KEY` for later integration
+   - `LEGACYLENS_QDRANT_URL` to private Railway qdrant URL
+   - `LEGACYLENS_ALLOWED_ORIGINS` to `["https://<web-service>.up.railway.app"]`
+   - `LEGACYLENS_OPENAI_API_KEY` for later integration
 4. Set web env var:
    - `VITE_API_BASE_URL` to public api domain, e.g. `https://<api-service>.up.railway.app`
 5. Deploy and open the web service domain in browser. You should see the shell and health status.

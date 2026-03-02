@@ -13,4 +13,4 @@ class Settings(BaseSettings):
     qdrant_api_key: str | None = None
     openai_api_key: str | None = None
 
-    model_config = SettingsConfigDict(env_prefix="LEGACY_", env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_prefix="LEGACYLENS_", env_file=".env", env_file_encoding="utf-8")
