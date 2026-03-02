@@ -17,6 +17,16 @@ Both environments run the same three services:
 2. Railway project already exists with `staging` and `production` environments.
 3. You have Railway service domains enabled for `api` and `web` in each environment.
 
+## 1.1 Environment file templates in this repo
+
+1. Backend staging: `backend/.env.staging.example`
+2. Backend production: `backend/.env.production.example`
+3. Frontend staging: `frontend/.env.staging.example`
+4. Frontend production: `frontend/.env.production.example`
+5. To generate local `.env` files from those templates, run:
+6. `./scripts/sync-env-files.sh`
+7. Generated `.env` files are gitignored and safe to edit locally.
+
 ## 2. First-time setup in Railway (staging)
 
 1. In Railway, select the `staging` environment.
