@@ -9,7 +9,7 @@ services:
     build: ./backend
     environment:
       LEGACY_QDRANT_URL: http://qdrant:6333
-      LEGACY_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      LEGACY_ALLOWED_ORIGINS: '["http://localhost:5173", "http://localhost:4173"]'
     depends_on:
       - qdrant
     ports:
