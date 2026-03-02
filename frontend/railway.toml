@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "if [ -f package.json ]; then npm ci && npm run build; else cd frontend && npm ci && npm run build; fi && npm install -g serve"
+buildCommand = "npm ci && npm run build"
 
 [deploy]
-startCommand = "if [ -d dist ]; then serve -s dist -l $PORT; else serve -s frontend/dist -l $PORT; fi"
+startCommand = "sh -c 'serve -s dist -l ${PORT:-4173}'"
