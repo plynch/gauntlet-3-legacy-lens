@@ -1,0 +1,49 @@
+name: Promote Staging Commit to Production (Railway)
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Commit SHA that is already validated in staging"
+        required: true
+        type: string
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy API to production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: railway up backend --path-as-root --ci --service api --environment production --project "$RAILWAY_PROJECT_ID"
+
+      - name: Deploy web to production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: railway up frontend --path-as-root --ci --service web --environment production --project "$RAILWAY_PROJECT_ID"
+
+      - name: Production smoke check API
+        env:
+          PRODUCTION_API_HEALTH_URL: ${{ secrets.PRODUCTION_API_HEALTH_URL }}
+        run: curl --fail --show-error --silent "$PRODUCTION_API_HEALTH_URL"
+
+      - name: Production smoke check web
+        env:
+          PRODUCTION_WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
+        run: curl --fail --show-error --silent --head "$PRODUCTION_WEB_URL"
