@@ -11,6 +11,8 @@ app = FastAPI(title=settings.app_name, version=settings.api_version)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
+    # Fallback for Railway-generated domains across staging/production environments.
+    allow_origin_regex=r"^https://.*\.up\.railway\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
