@@ -11,6 +11,8 @@ WORKDIR /app
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN npm i -g serve
+RUN chmod +x ./docker-entrypoint.sh
 
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-4173}"]
+CMD ["./docker-entrypoint.sh"]

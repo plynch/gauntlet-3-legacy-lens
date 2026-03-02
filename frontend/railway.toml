@@ -3,4 +3,4 @@ builder = "NIXPACKS"
 buildCommand = "npm ci && npm run build"
 
 [deploy]
-startCommand = "sh -c 'serve -s dist -l ${PORT:-4173}'"
+startCommand = "sh -c './docker-entrypoint.sh'"

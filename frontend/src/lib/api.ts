@@ -7,6 +7,15 @@ export interface HealthResponse {
 
 const fallbackApiBase = 'http://localhost:8000'
 
+type RuntimeConfig = {
+  API_BASE_URL?: string
+}
+
+function getRuntimeConfig(): RuntimeConfig | undefined {
+  const globalWindow = window as typeof window & { __APP_CONFIG__?: RuntimeConfig }
+  return globalWindow.__APP_CONFIG__
+}
+
 function normalizeApiBase(rawValue: string | undefined): string {
   const value = (rawValue || '').trim()
   if (!value) return fallbackApiBase
@@ -19,7 +28,9 @@ function normalizeApiBase(rawValue: string | undefined): string {
   return withoutQuotes.replace(/\/+$/, '')
 }
 
-const apiBase = normalizeApiBase(import.meta.env.VITE_API_BASE_URL as string | undefined)
+const apiBase = normalizeApiBase(
+  getRuntimeConfig()?.API_BASE_URL || (import.meta.env.VITE_API_BASE_URL as string | undefined),
+)
 
 export async function getHealth(): Promise<HealthResponse> {
   const response = await fetch(`${apiBase}/api/health`)
