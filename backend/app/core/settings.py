@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     generation_model: str = "gpt-4.1-mini"
     local_embedding_dimensions: int = 256
+    openai_timeout_seconds: float = 120.0
+    embedding_batch_size: int = 24
+    embedding_max_retries: int = 3
+    embedding_retry_backoff_seconds: float = 1.5
     query_top_k: int = 5
     max_context_characters: int = 9000
     source_directories: list[str] = Field(default_factory=lambda: ["data/corpus/sourceforge-trunk"])

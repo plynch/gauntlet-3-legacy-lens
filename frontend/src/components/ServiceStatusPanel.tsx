@@ -144,11 +144,12 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   }
 
   async function onSourceForgeFullIngestClick() {
+    const syncStartedLabel = new Date().toLocaleString()
     setIngestLoadingMode('full')
     setLastIngestMode('full')
     setIngestError('')
     setIngestStats(null)
-    setSyncSummary(`Began syncing SourceForge trunk at ${new Date().toLocaleString()}.`)
+    setSyncSummary(`Began SourceForge sync at ${syncStartedLabel}.`)
     setPipelinePhase('syncing')
     setOperationStartedAt(Date.now())
     setElapsedSeconds(0)
@@ -156,9 +157,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     try {
       const syncStats = await syncSourceForge()
       setSyncSummary(
-        `SourceForge sync complete (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(
-          syncStats.synced_at,
-        ).toLocaleString()}. Full indexing is now running.`,
+        `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(syncStats.synced_at).toLocaleString()}. Full indexing is now running.`,
       )
 
       setPipelinePhase('indexing')

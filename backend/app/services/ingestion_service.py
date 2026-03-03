@@ -98,10 +98,24 @@ class IngestionService:
 
     def _embed_chunks(self, chunks: list[SourceChunk]) -> list[list[float]]:
         vectors: list[list[float]] = []
-        for batch in batched(chunks, 64):
+        batch_size = max(1, self._settings.embedding_batch_size)
+        for batch in batched(chunks, batch_size):
             texts = [item.text for item in batch]
-            vectors.extend(self._openai_gateway.embed_texts(texts, model=self._settings.embedding_model))
+            vectors.extend(self._embed_texts_with_timeout_fallback(texts))
         return vectors
+
+    def _embed_texts_with_timeout_fallback(self, texts: list[str]) -> list[list[float]]:
+        try:
+            return self._openai_gateway.embed_texts(texts, model=self._settings.embedding_model)
+        except RuntimeError as exc:
+            message = str(exc).lower()
+            if len(texts) == 1 or "timed out" not in message:
+                raise
+
+            midpoint = max(1, len(texts) // 2)
+            left_vectors = self._embed_texts_with_timeout_fallback(texts[:midpoint])
+            right_vectors = self._embed_texts_with_timeout_fallback(texts[midpoint:])
+            return left_vectors + right_vectors
 
 
 def batched(items: list[SourceChunk], size: int) -> Iterable[list[SourceChunk]]:

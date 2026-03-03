@@ -1,5 +1,6 @@
 import hashlib
 import math
+import time
 from collections.abc import Sequence
 
 import httpx
@@ -8,9 +9,18 @@ from app.services.types import SearchHit
 
 
 class OpenAIGateway:
-    def __init__(self, api_key: str | None, timeout_seconds: float = 45.0, local_embedding_dimensions: int = 256):
+    def __init__(
+        self,
+        api_key: str | None,
+        timeout_seconds: float = 120.0,
+        local_embedding_dimensions: int = 256,
+        embedding_max_retries: int = 3,
+        embedding_retry_backoff_seconds: float = 1.5,
+    ):
         self._api_key = api_key
         self._local_embedding_dimensions = local_embedding_dimensions
+        self._embedding_max_retries = max(1, embedding_max_retries)
+        self._embedding_retry_backoff_seconds = max(0.1, embedding_retry_backoff_seconds)
         self._client = httpx.Client(timeout=timeout_seconds)
 
     def close(self) -> None:
@@ -22,16 +32,42 @@ class OpenAIGateway:
         if not self._api_key:
             return [local_embedding(text, self._local_embedding_dimensions) for text in texts]
 
-        response = self._client.post(
-            "https://api.openai.com/v1/embeddings",
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
-            json={"model": model, "input": list(texts)},
-        )
-        if not response.is_success:
+        last_error: RuntimeError | None = None
+        for attempt in range(1, self._embedding_max_retries + 1):
+            try:
+                response = self._client.post(
+                    "https://api.openai.com/v1/embeddings",
+                    headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
+                    json={"model": model, "input": list(texts)},
+                )
+            except httpx.TimeoutException as exc:
+                last_error = RuntimeError(f"Embedding request timed out on attempt {attempt}.")
+                if attempt < self._embedding_max_retries:
+                    self._sleep_before_retry(attempt)
+                    continue
+                raise last_error from exc
+            except httpx.RequestError as exc:
+                last_error = RuntimeError(f"Embedding request failed on attempt {attempt}: {exc}")
+                if attempt < self._embedding_max_retries:
+                    self._sleep_before_retry(attempt)
+                    continue
+                raise last_error from exc
+
+            if response.is_success:
+                data = response.json()
+                return [item["embedding"] for item in data.get("data", [])]
+
+            if response.status_code in {408, 409, 429} or response.status_code >= 500:
+                last_error = RuntimeError(
+                    f"Embedding request returned retriable status {response.status_code} on attempt {attempt}."
+                )
+                if attempt < self._embedding_max_retries:
+                    self._sleep_before_retry(attempt)
+                    continue
+
             raise RuntimeError(f"Failed to embed texts: {response.status_code} {response.text}")
 
-        data = response.json()
-        return [item["embedding"] for item in data.get("data", [])]
+        raise last_error or RuntimeError("Failed to embed texts after retries.")
 
     def generate_answer(self, question: str, hits: Sequence[SearchHit], model: str, max_context_characters: int) -> str:
         if not hits:
@@ -67,6 +103,10 @@ class OpenAIGateway:
         if not choices:
             return fallback_answer(question, hits)
         return choices[0].get("message", {}).get("content", "").strip() or fallback_answer(question, hits)
+
+    def _sleep_before_retry(self, attempt: int) -> None:
+        backoff_seconds = self._embedding_retry_backoff_seconds * (2 ** (attempt - 1))
+        time.sleep(backoff_seconds)
 
 
 def build_context(hits: Sequence[SearchHit], max_context_characters: int) -> str:
