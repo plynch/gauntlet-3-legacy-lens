@@ -26,6 +26,49 @@ Then open:
 - Frontend: `http://localhost:4173`
 - API health: `http://localhost:8000/api/health`
 
+## Testing and quality checks
+
+Backend fast local loop (recommended for daily development):
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pytest -q tests
+ruff check app tests
+```
+
+Backend Docker fallback (if you do not want local Python tooling):
+
+```bash
+docker compose run --rm -v "$PWD/backend:/app" api sh -lc \
+  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app pytest -q tests"
+```
+
+Backend lint:
+
+```bash
+docker compose run --rm -v "$PWD/backend:/app" api sh -lc \
+  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app ruff check app tests"
+```
+
+Fast targeted backend test (example):
+
+```bash
+docker compose run --rm -v "$PWD/backend:/app" api sh -lc \
+  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app pytest -q tests/test_query_service.py"
+```
+
+Frontend checks:
+
+```bash
+cd frontend
+npm ci
+npm run lint
+npm run build
+```
+
 ## API quickstart
 
 1. Index corpus:
