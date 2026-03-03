@@ -8,6 +8,7 @@ import {
   runIngest,
   syncSourceForge,
 } from '../lib/api'
+import { formatAustinDateTime } from '../lib/time'
 import {
   IngestMode,
   PipelinePhase,
@@ -19,7 +20,6 @@ import {
   phaseLabel,
   progressPercent,
 } from './serviceStatusUtils'
-
 type ServiceStatusPanelProps = {
   health: HealthResponse | null
   healthLoading: boolean
@@ -139,7 +139,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   }
 
   async function onSourceForgeFullIngestClick() {
-    const syncStartedLabel = new Date().toLocaleString()
+    const syncStartedLabel = formatAustinDateTime(new Date())
     let syncFinishedLabel: string | null = null
     setIngestLoadingMode('full')
     setLastIngestMode('full')
@@ -152,7 +152,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
 
     try {
       const syncStats = await syncSourceForge()
-      syncFinishedLabel = new Date(syncStats.synced_at).toLocaleString()
+      syncFinishedLabel = formatAustinDateTime(syncStats.synced_at)
       setSyncSummary(
         `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${syncFinishedLabel}. Starting full indexing.`,
       )
@@ -162,7 +162,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
       setLastIndexedAt(stats.completed_at)
       setPipelinePhase('completed')
       setSyncSummary(
-        `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${syncFinishedLabel}. Full indexing completed at ${new Date(stats.completed_at).toLocaleString()}.`,
+        `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${syncFinishedLabel}. Full indexing completed at ${formatAustinDateTime(stats.completed_at)}.`,
       )
     } catch (err: unknown) {
       setPipelinePhase('failed')
@@ -186,7 +186,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const isIndexing = pipelinePhase === 'indexing'
   const ingestBreakdown = ingestStats ? ingestBuckets(ingestStats) : null
   const ingestControlsEnabled = areIngestControlsEnabled()
-  const lastIndexedLabel = lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : statusLoaded ? 'not yet indexed' : 'loading...'
+  const lastIndexedLabel = lastIndexedAt ? formatAustinDateTime(lastIndexedAt) : statusLoaded ? 'not yet indexed' : 'loading...'
 
   return (
     <section className="status-panel">
@@ -202,7 +202,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
           <li>Status: {health.status}</li>
           <li>Service: {health.service}</li>
           <li>Qdrant configured: {health.qdrant_configured ? 'yes' : 'no'}</li>
-          <li>Timestamp: {new Date(health.timestamp).toLocaleString()}</li>
+          <li>Timestamp: {formatAustinDateTime(health.timestamp)}</li>
         </ul>
       ) : null}
 
@@ -262,8 +262,8 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
               <p className="status-message">{formatIngestSummary(ingestStats, lastIngestMode)}</p>
               <ul className="health-list">
                 <li>Mode: {ingestStats.mode}</li>
-                <li>Started: {new Date(ingestStats.started_at).toLocaleString()}</li>
-                <li>Completed: {new Date(ingestStats.completed_at).toLocaleString()}</li>
+                <li>Started: {formatAustinDateTime(ingestStats.started_at)}</li>
+                <li>Completed: {formatAustinDateTime(ingestStats.completed_at)}</li>
                 <li>Duration: {formatDuration(ingestStats.duration_seconds)}</li>
                 <li>Corpus LOC: {ingestStats.corpus_loc}</li>
                 <li>Time per 10,000 LOC: {formatSecondsPerTenThousandLoc(ingestStats.duration_seconds, ingestStats.corpus_loc)}</li>

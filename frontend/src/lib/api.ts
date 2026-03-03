@@ -187,9 +187,9 @@ export function buildSourceLink(path: string, lineStart: number, lineEnd: number
     .join("/")
 
   const start = Number.isFinite(lineStart) ? Math.max(1, Math.trunc(lineStart)) : 1
-  const end = Number.isFinite(lineEnd) ? Math.max(start, Math.trunc(lineEnd)) : start
-  const rangeFragment = end > start ? `-l${end}` : ''
-  return `${base}/${normalizedPath}?r=HEAD#l${start}${rangeFragment}`
+  void lineEnd
+  // SourceForge reliably supports single-line anchors only.
+  return `${base}/${normalizedPath}?r=HEAD#l${start}`
 }
 
 export function areIngestControlsEnabled(): boolean {

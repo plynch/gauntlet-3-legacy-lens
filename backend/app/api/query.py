@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException
 
@@ -18,6 +19,7 @@ from app.services.sourceforge_corpus import sync_sourceforge_trunk
 
 router = APIRouter()
 settings = Settings()
+AUSTIN_TZ = ZoneInfo("America/Chicago")
 
 
 @router.get("/features", response_model=FeatureListResponse)
@@ -42,7 +44,7 @@ def run_query(payload: QueryRequest) -> QueryResponse:
 
 @router.post("/ingest", response_model=IngestStats)
 def run_ingest(mode: Literal["full", "incremental"] = "incremental") -> IngestStats:
-    started_label = datetime.now().astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+    started_label = _format_austin_timestamp(datetime.now(AUSTIN_TZ))
     if not ingest_status_store.try_begin(mode=mode, phase="indexing", summary=f"Began {mode} ingest at {started_label}."):
         raise HTTPException(status_code=409, detail=_ingest_busy_detail())
     try:
@@ -56,7 +58,7 @@ def run_ingest(mode: Literal["full", "incremental"] = "incremental") -> IngestSt
             stats = ingestion_service.ingest(mode=mode)
         ingest_status_store.mark_completed(
             stats,
-            summary=f"Began {mode} ingest at {started_label}. Ingest completed at {stats.completed_at.astimezone().strftime('%-m/%-d/%Y, %-I:%M:%S %p')}.",
+            summary=f"Began {mode} ingest at {started_label}. Ingest completed at {_format_austin_timestamp(stats.completed_at)}.",
         )
         return stats
     except Exception as exc:  # pragma: no cover - handled by integration testing
@@ -78,7 +80,7 @@ def get_ingest_status() -> IngestStatus:
 
 @router.post("/corpus/sourceforge/sync", response_model=SourceForgeSyncStats)
 def sync_sourceforge() -> SourceForgeSyncStats:
-    sync_started_label = datetime.now().astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+    sync_started_label = _format_austin_timestamp(datetime.now(AUSTIN_TZ))
     if not ingest_status_store.try_begin(
         mode="full",
         phase="syncing",
@@ -88,7 +90,7 @@ def sync_sourceforge() -> SourceForgeSyncStats:
     try:
         destination = settings.source_directories[0]
         sync_stats = sync_sourceforge_trunk(destination, timeout_seconds=settings.sourceforge_sync_timeout_seconds)
-        sync_completed_label = sync_stats.synced_at.astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+        sync_completed_label = _format_austin_timestamp(sync_stats.synced_at)
         ingest_status_store.mark_sync_only_completed(
             sync_stats,
             summary=(
@@ -108,7 +110,7 @@ def sync_sourceforge() -> SourceForgeSyncStats:
 
 @router.post("/corpus/sourceforge/full-ingest", response_model=SourceForgeFullIngestResponse)
 def sourceforge_full_ingest() -> SourceForgeFullIngestResponse:
-    sync_started_label = datetime.now().astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+    sync_started_label = _format_austin_timestamp(datetime.now(AUSTIN_TZ))
     if not ingest_status_store.try_begin(
         mode="full",
         phase="syncing",
@@ -119,7 +121,7 @@ def sourceforge_full_ingest() -> SourceForgeFullIngestResponse:
     try:
         destination = settings.source_directories[0]
         sync_stats = sync_sourceforge_trunk(destination, timeout_seconds=settings.sourceforge_sync_timeout_seconds)
-        sync_completed_label = sync_stats.synced_at.astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+        sync_completed_label = _format_austin_timestamp(sync_stats.synced_at)
         ingest_status_store.mark_sync_completed(
             sync_stats,
             summary=(
@@ -142,7 +144,7 @@ def sourceforge_full_ingest() -> SourceForgeFullIngestResponse:
             summary=(
                 f"Began SourceForge sync at {sync_started_label}. "
                 f"Finished SourceForge sync ({sync_stats.files_synced} files, {sync_stats.corpus_loc} LOC) at {sync_completed_label}. "
-                f"Full indexing completed at {ingest_stats.completed_at.astimezone().strftime('%-m/%-d/%Y, %-I:%M:%S %p')}."
+                f"Full indexing completed at {_format_austin_timestamp(ingest_stats.completed_at)}."
             ),
         )
         return SourceForgeFullIngestResponse(sync=sync_stats, ingest=ingest_stats)
@@ -189,3 +191,7 @@ def _ingest_busy_detail() -> str:
     phase = status.phase.replace("_", " ")
     mode = status.mode or "unknown"
     return f"Another ingest operation is already in progress (mode={mode}, phase={phase})."
+
+
+def _format_austin_timestamp(value: datetime) -> str:
+    return value.astimezone(AUSTIN_TZ).strftime("%-m/%-d/%Y, %-I:%M:%S %p %Z")
