@@ -1,0 +1,18 @@
+[
+  {
+    "question": "Where does this program open files?",
+    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+  },
+  {
+    "question": "Where is the customer file read?",
+    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+  },
+  {
+    "question": "Where is the annual fee applied?",
+    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+  },
+  {
+    "question": "Which section closes the customer file?",
+    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+  }
+]
