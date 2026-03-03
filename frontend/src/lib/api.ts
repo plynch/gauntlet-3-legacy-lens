@@ -28,11 +28,10 @@ function normalizeApiBase(rawValue: string | undefined): string {
   return withoutQuotes.replace(/\/+$/, '')
 }
 
-const apiBase = normalizeApiBase(
-  getRuntimeConfig()?.API_BASE_URL || (import.meta.env.VITE_API_BASE_URL as string | undefined),
-)
-
 export async function getHealth(): Promise<HealthResponse> {
+  const apiBase = normalizeApiBase(
+    getRuntimeConfig()?.API_BASE_URL || (import.meta.env.VITE_API_BASE_URL as string | undefined),
+  )
   const response = await fetch(`${apiBase}/api/health`)
 
   if (!response.ok) {
