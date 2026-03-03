@@ -33,6 +33,7 @@ class IngestStatus(BaseModel):
     sync_corpus_bytes: int | None = None
     ingest_stats: IngestStats | None = None
     last_indexed_at: datetime | None = None
+    has_indexed_data: bool = False
     summary: str | None = None
     error: str | None = None
     error_stage: Literal["sync", "indexing"] | None = None

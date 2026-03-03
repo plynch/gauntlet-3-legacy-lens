@@ -1,25 +1,7 @@
 import { useEffect, useState } from 'react'
-import {
-  HealthResponse,
-  IngestStats,
-  IngestStatus,
-  areIngestControlsEnabled,
-  getIngestStatus,
-  runIngest,
-  syncSourceForge,
-} from '../lib/api'
+import { HealthResponse, IngestStats, IngestStatus, areIngestControlsEnabled, getIngestStatus, runIngest, syncSourceForge } from '../lib/api'
 import { formatAustinDateTime } from '../lib/time'
-import {
-  IngestMode,
-  PipelinePhase,
-  formatBytes,
-  formatDuration,
-  formatIngestSummary,
-  formatSecondsPerTenThousandLoc,
-  ingestBuckets,
-  phaseLabel,
-  progressPercent,
-} from './serviceStatusUtils'
+import { IngestMode, PipelinePhase, formatBytes, formatDuration, formatIngestSummary, formatSecondsPerTenThousandLoc, ingestBuckets, phaseLabel, progressPercent } from './serviceStatusUtils'
 type ServiceStatusPanelProps = {
   health: HealthResponse | null
   healthLoading: boolean
@@ -38,6 +20,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [lastIndexedAt, setLastIndexedAt] = useState<string | null>(null)
+  const [hasIndexedData, setHasIndexedData] = useState(false)
   const [statusLoaded, setStatusLoaded] = useState(false)
 
   useEffect(() => {
@@ -84,6 +67,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     setIngestError(status.error || '')
     setSyncSummary(status.summary || '')
     setLastIndexedAt(status.last_indexed_at || status.ingest_stats?.completed_at || null)
+    setHasIndexedData(status.has_indexed_data || status.ingest_stats !== null)
 
     if (status.active && status.started_at) {
       const startedAtMs = new Date(status.started_at).getTime()
@@ -128,6 +112,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
       const stats = await runIngest(mode)
       setIngestStats(stats)
       setLastIndexedAt(stats.completed_at)
+      setHasIndexedData(true)
       setPipelinePhase('completed')
     } catch (err: unknown) {
       setPipelinePhase('failed')
@@ -160,6 +145,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
       const stats = await runIngest('full')
       setIngestStats(stats)
       setLastIndexedAt(stats.completed_at)
+      setHasIndexedData(true)
       setPipelinePhase('completed')
       setSyncSummary(
         `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${syncFinishedLabel}. Full indexing completed at ${formatAustinDateTime(stats.completed_at)}.`,
@@ -186,7 +172,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const isIndexing = pipelinePhase === 'indexing'
   const ingestBreakdown = ingestStats ? ingestBuckets(ingestStats) : null
   const ingestControlsEnabled = areIngestControlsEnabled()
-  const lastIndexedLabel = lastIndexedAt ? formatAustinDateTime(lastIndexedAt) : statusLoaded ? 'not yet indexed' : 'loading...'
+  const lastIndexedLabel = lastIndexedAt ? formatAustinDateTime(lastIndexedAt) : statusLoaded ? (hasIndexedData ? 'indexed previously (timestamp unavailable)' : 'not yet indexed') : 'loading...'
 
   return (
     <section className="status-panel">

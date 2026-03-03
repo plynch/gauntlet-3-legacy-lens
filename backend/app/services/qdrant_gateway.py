@@ -42,6 +42,18 @@ class QdrantGateway:
     def has_points_for_source_path(self, collection_name: str, source_path: str) -> bool:
         return self._scroll_one_by_path(collection_name, source_path) is not None
 
+    def has_any_points(self, collection_name: str) -> bool:
+        response = self._client.post(
+            f"/collections/{collection_name}/points/count",
+            json={"exact": False},
+        )
+        if response.status_code == 404:
+            return False
+        self._raise_for_error(response, "count points")
+        data = response.json()
+        count = int(data.get("result", {}).get("count", 0))
+        return count > 0
+
     def delete_points_for_source_path(self, collection_name: str, source_path: str) -> None:
         response = self._client.post(
             f"/collections/{collection_name}/points/delete?wait=true",
@@ -49,9 +61,15 @@ class QdrantGateway:
         )
         self._raise_for_error(response, "delete old points")
 
-    def upsert_points(self, collection_name: str, chunks: Sequence[SourceChunk], vectors: Sequence[list[float]]) -> None:
+    def upsert_points(
+        self,
+        collection_name: str,
+        chunks: Sequence[SourceChunk],
+        vectors: Sequence[list[float]],
+        indexed_at: str | None = None,
+    ) -> None:
         points = [
-            {"id": chunk.id, "vector": vector, "payload": chunk_payload(chunk)}
+            {"id": chunk.id, "vector": vector, "payload": chunk_payload(chunk, indexed_at=indexed_at)}
             for chunk, vector in zip(chunks, vectors, strict=True)
         ]
         response = self._client.put(
@@ -116,7 +134,7 @@ class QdrantGateway:
         raise RuntimeError(f"Failed to {action}: {response.status_code} {response.text}")
 
 
-def chunk_payload(chunk: SourceChunk) -> dict[str, str | int | None]:
+def chunk_payload(chunk: SourceChunk, indexed_at: str | None = None) -> dict[str, str | int | None]:
     return {
         "text": chunk.text,
         "source_path": chunk.source_path,
@@ -124,4 +142,5 @@ def chunk_payload(chunk: SourceChunk) -> dict[str, str | int | None]:
         "line_start": chunk.line_start,
         "line_end": chunk.line_end,
         "section": chunk.section,
+        "indexed_at": indexed_at,
     }

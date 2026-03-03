@@ -23,7 +23,13 @@ class FakeQdrantGateway:
     def delete_points_for_source_path(self, collection_name: str, source_path: str) -> None:
         self.delete_calls += 1
 
-    def upsert_points(self, collection_name: str, chunks: list[SourceChunk], vectors: list[list[float]]) -> None:
+    def upsert_points(
+        self,
+        collection_name: str,
+        chunks: list[SourceChunk],
+        vectors: list[list[float]],
+        indexed_at: str | None = None,
+    ) -> None:
         self.upsert_calls += 1
 
     def has_points_for_source_path(self, collection_name: str, source_path: str) -> bool:

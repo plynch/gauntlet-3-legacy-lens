@@ -45,10 +45,11 @@ class IngestionService:
             corpus_loc = 0
             skipped_paths: list[str] = []
             collection_ready = False
+            indexed_at = started_at.isoformat()
 
             for path in files:
                 indexed_chunks, file_bytes, file_loc, skip_reason = self._ingest_file(
-                    path=path, mode=mode, collection_ready=collection_ready
+                    path=path, mode=mode, collection_ready=collection_ready, indexed_at=indexed_at
                 )
                 corpus_bytes += file_bytes
                 corpus_loc += file_loc
@@ -107,7 +108,7 @@ class IngestionService:
             return stats
 
     def _ingest_file(
-        self, path: Path, mode: str, collection_ready: bool
+        self, path: Path, mode: str, collection_ready: bool, indexed_at: str
     ) -> tuple[int, int, int, Literal["unchanged", "not_indexable"] | None]:
         source = load_source_file(path)
         file_bytes = len(source.text.encode("utf-8", errors="ignore"))
@@ -132,7 +133,12 @@ class IngestionService:
             if not collection_ready:
                 self._qdrant.ensure_collection(self._settings.qdrant_collection, vector_size=len(vectors[0]))
             self._qdrant.delete_points_for_source_path(self._settings.qdrant_collection, source.path)
-            self._qdrant.upsert_points(self._settings.qdrant_collection, chunks=chunks, vectors=vectors)
+            self._qdrant.upsert_points(
+                self._settings.qdrant_collection,
+                chunks=chunks,
+                vectors=vectors,
+                indexed_at=indexed_at,
+            )
 
         return len(chunks), file_bytes, file_loc, None
 

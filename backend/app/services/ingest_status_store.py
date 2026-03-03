@@ -24,6 +24,7 @@ class IngestStatusStore:
         with self._lock:
             if self._status.last_indexed_at is None and fallback_last_indexed_at is not None:
                 self._status.last_indexed_at = fallback_last_indexed_at
+                self._status.has_indexed_data = True
                 self._status.updated_at = _utc_now()
             return self._status.model_copy(deep=True)
 
@@ -72,11 +73,19 @@ class IngestStatusStore:
             self._status.phase = "completed"
             self._status.ingest_stats = ingest_stats
             self._status.last_indexed_at = ingest_stats.completed_at
+            self._status.has_indexed_data = True
             self._status.error = None
             self._status.error_stage = None
             self._status.updated_at = _utc_now()
             if summary is not None:
                 self._status.summary = summary
+
+    def mark_indexed_data_detected(self) -> None:
+        with self._lock:
+            if self._status.has_indexed_data:
+                return
+            self._status.has_indexed_data = True
+            self._status.updated_at = _utc_now()
 
     def mark_failed(self, *, error: str, stage: ErrorStage, summary: str | None = None) -> None:
         with self._lock:

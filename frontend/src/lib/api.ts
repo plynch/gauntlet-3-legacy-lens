@@ -60,6 +60,7 @@ export interface IngestStatus {
   sync_corpus_bytes: number | null
   ingest_stats: IngestStats | null
   last_indexed_at: string | null
+  has_indexed_data: boolean
   summary: string | null
   error: string | null
   error_stage: 'sync' | 'indexing' | null
