@@ -108,6 +108,16 @@ Only after browser flow passes, run API checks if needed.
 7. `GET /api/features`
 8. `POST /api/features/{feature_key}/query`
 
+## Observability (Langfuse)
+
+When `LEGACYLENS_LANGFUSE_BASE_URL`, `LEGACYLENS_LANGFUSE_PUBLIC_KEY`, and `LEGACYLENS_LANGFUSE_SECRET_KEY`
+are configured on the API service, traces appear in Langfuse under:
+
+1. `query.answer` (user query workflow)
+2. `ingest.run` (indexing workflow)
+3. `openai.embeddings` (embedding calls)
+4. `openai.chat_completion` (answer generation calls)
+
 ## Deployment Model
 
 1. Railway `staging` tracks `main`.

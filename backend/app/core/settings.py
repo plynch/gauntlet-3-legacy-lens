@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str | None = None
     openai_api_key: str | None = None
+    langfuse_base_url: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
     qdrant_collection: str = "legacylens_chunks"
     embedding_model: str = "text-embedding-3-small"
     generation_model: str = "gpt-4.1-mini"

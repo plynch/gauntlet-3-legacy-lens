@@ -10,80 +10,101 @@ from app.services.file_discovery import discover_source_files, load_source_file
 from app.services.ingest_benchmarks import append_ingest_run
 from app.services.openai_gateway import OpenAIGateway
 from app.services.qdrant_gateway import QdrantGateway
+from app.services.tracing import LangfuseTracer
 from app.services.types import SourceChunk
 
 
 class IngestionService:
-    def __init__(self, settings: Settings, qdrant: QdrantGateway, openai_gateway: OpenAIGateway) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        qdrant: QdrantGateway,
+        openai_gateway: OpenAIGateway,
+        tracer: LangfuseTracer | None = None,
+    ) -> None:
         self._settings = settings
         self._qdrant = qdrant
         self._openai_gateway = openai_gateway
+        self._tracer = tracer or getattr(openai_gateway, "tracer", None)
 
     def ingest(self, mode: str = "incremental") -> IngestStats:
-        started_at = datetime.now(timezone.utc)
-        files = discover_source_files(
-            source_directories=self._settings.source_directories,
-            source_extensions=self._settings.source_extensions,
-        )
-
-        files_seen = len(files)
-        files_indexed = 0
-        files_skipped = 0
-        files_unchanged = 0
-        files_not_indexable = 0
-        chunks_indexed = 0
-        corpus_bytes = 0
-        corpus_loc = 0
-        skipped_paths: list[str] = []
-        collection_ready = False
-
-        for path in files:
-            indexed_chunks, file_bytes, file_loc, skip_reason = self._ingest_file(
-                path=path, mode=mode, collection_ready=collection_ready
+        with self._ingest_trace(mode=mode) as trace:
+            started_at = datetime.now(timezone.utc)
+            files = discover_source_files(
+                source_directories=self._settings.source_directories,
+                source_extensions=self._settings.source_extensions,
             )
-            corpus_bytes += file_bytes
-            corpus_loc += file_loc
-            if indexed_chunks == 0:
-                files_skipped += 1
-                if skip_reason == "unchanged":
-                    files_unchanged += 1
-                    if len(skipped_paths) < 15:
-                        skipped_paths.append(f"{path} (unchanged file hash)")
-                elif skip_reason == "not_indexable":
-                    files_not_indexable += 1
-                    if len(skipped_paths) < 15:
-                        skipped_paths.append(f"{path} (no indexable content)")
-                elif skip_reason and len(skipped_paths) < 15:
-                    skipped_paths.append(f"{path} ({skip_reason})")
-                continue
 
-            files_indexed += 1
-            chunks_indexed += indexed_chunks
-            collection_ready = True
+            files_seen = len(files)
+            files_indexed = 0
+            files_skipped = 0
+            files_unchanged = 0
+            files_not_indexable = 0
+            chunks_indexed = 0
+            corpus_bytes = 0
+            corpus_loc = 0
+            skipped_paths: list[str] = []
+            collection_ready = False
 
-        completed_at = datetime.now(timezone.utc)
-        duration_seconds = (completed_at - started_at).total_seconds()
-        stats = IngestStats(
-            mode=mode,
-            started_at=started_at,
-            completed_at=completed_at,
-            duration_seconds=duration_seconds,
-            files_seen=files_seen,
-            files_indexed=files_indexed,
-            files_skipped=files_skipped,
-            files_unchanged=files_unchanged,
-            files_not_indexable=files_not_indexable,
-            chunks_indexed=chunks_indexed,
-            corpus_bytes=corpus_bytes,
-            corpus_loc=corpus_loc,
-            skipped_paths=skipped_paths,
-        )
-        try:
-            append_ingest_run(self._settings.ingest_benchmark_log_path, stats)
-        except OSError:
-            # Benchmark logging should not block successful indexing.
-            pass
-        return stats
+            for path in files:
+                indexed_chunks, file_bytes, file_loc, skip_reason = self._ingest_file(
+                    path=path, mode=mode, collection_ready=collection_ready
+                )
+                corpus_bytes += file_bytes
+                corpus_loc += file_loc
+                if indexed_chunks == 0:
+                    files_skipped += 1
+                    if skip_reason == "unchanged":
+                        files_unchanged += 1
+                        if len(skipped_paths) < 15:
+                            skipped_paths.append(f"{path} (unchanged file hash)")
+                    elif skip_reason == "not_indexable":
+                        files_not_indexable += 1
+                        if len(skipped_paths) < 15:
+                            skipped_paths.append(f"{path} (no indexable content)")
+                    elif skip_reason and len(skipped_paths) < 15:
+                        skipped_paths.append(f"{path} ({skip_reason})")
+                    continue
+
+                files_indexed += 1
+                chunks_indexed += indexed_chunks
+                collection_ready = True
+
+            completed_at = datetime.now(timezone.utc)
+            duration_seconds = (completed_at - started_at).total_seconds()
+            stats = IngestStats(
+                mode=mode,
+                started_at=started_at,
+                completed_at=completed_at,
+                duration_seconds=duration_seconds,
+                files_seen=files_seen,
+                files_indexed=files_indexed,
+                files_skipped=files_skipped,
+                files_unchanged=files_unchanged,
+                files_not_indexable=files_not_indexable,
+                chunks_indexed=chunks_indexed,
+                corpus_bytes=corpus_bytes,
+                corpus_loc=corpus_loc,
+                skipped_paths=skipped_paths,
+            )
+            trace.update(
+                output={
+                    "mode": mode,
+                    "files_seen": stats.files_seen,
+                    "files_indexed": stats.files_indexed,
+                    "files_unchanged": stats.files_unchanged,
+                    "files_not_indexable": stats.files_not_indexable,
+                    "chunks_indexed": stats.chunks_indexed,
+                    "duration_seconds": stats.duration_seconds,
+                    "corpus_loc": stats.corpus_loc,
+                }
+            )
+            try:
+                append_ingest_run(self._settings.ingest_benchmark_log_path, stats)
+            except OSError:
+                # Benchmark logging should not block successful indexing.
+                pass
+            return stats
 
     def _ingest_file(
         self, path: Path, mode: str, collection_ready: bool
@@ -136,7 +157,34 @@ class IngestionService:
             right_vectors = self._embed_texts_with_timeout_fallback(texts[midpoint:])
             return left_vectors + right_vectors
 
+    def _ingest_trace(self, *, mode: str):
+        if not self._tracer:
+            return _NullTraceContext()
+        return self._tracer.span(
+            name="ingest.run",
+            input={"mode": mode},
+            metadata={
+                "source_directories": self._settings.source_directories,
+                "source_extensions": self._settings.source_extensions,
+                "chunk_max_lines": self._settings.chunk_max_lines,
+                "chunk_overlap_lines": self._settings.chunk_overlap_lines,
+            },
+        )
+
 
 def batched(items: list[SourceChunk], size: int) -> Iterable[list[SourceChunk]]:
     for start in range(0, len(items), size):
         yield items[start : start + size]
+
+
+class _NullTraceContext:
+    def __enter__(self):
+        return _NullTrace()
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class _NullTrace:
+    def update(self, **kwargs: object) -> None:  # pragma: no cover - trivial no-op
+        return

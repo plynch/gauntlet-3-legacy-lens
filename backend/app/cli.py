@@ -31,6 +31,7 @@ def run_ingest(mode: Literal["full", "incremental"]) -> None:
             settings=services.settings,
             qdrant=services.qdrant,
             openai_gateway=services.openai_gateway,
+            tracer=services.tracer,
         )
         stats = ingestion_service.ingest(mode=mode)
     print(json.dumps(stats.model_dump(mode="json"), indent=2))

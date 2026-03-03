@@ -2,10 +2,15 @@ import hashlib
 import math
 import time
 from collections.abc import Sequence
+from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 import httpx
 
 from app.services.types import SearchHit
+
+if TYPE_CHECKING:
+    from app.services.tracing import LangfuseTracer
 
 
 class OpenAIGateway:
@@ -16,12 +21,18 @@ class OpenAIGateway:
         local_embedding_dimensions: int = 256,
         embedding_max_retries: int = 3,
         embedding_retry_backoff_seconds: float = 1.5,
+        tracer: "LangfuseTracer | None" = None,
     ):
         self._api_key = api_key
         self._local_embedding_dimensions = local_embedding_dimensions
         self._embedding_max_retries = max(1, embedding_max_retries)
         self._embedding_retry_backoff_seconds = max(0.1, embedding_retry_backoff_seconds)
         self._client = httpx.Client(timeout=timeout_seconds)
+        self._tracer = tracer
+
+    @property
+    def tracer(self) -> "LangfuseTracer | None":
+        return self._tracer
 
     def close(self) -> None:
         self._client.close()
@@ -29,84 +40,160 @@ class OpenAIGateway:
     def embed_texts(self, texts: Sequence[str], model: str) -> list[list[float]]:
         if not texts:
             return []
-        if not self._api_key:
-            return [local_embedding(text, self._local_embedding_dimensions) for text in texts]
+        with self._generation_trace(
+            name="openai.embeddings",
+            model=model,
+            input={
+                "text_count": len(texts),
+                "total_characters": sum(len(text) for text in texts),
+            },
+            metadata={"provider": "openai", "uses_remote_model": bool(self._api_key)},
+        ) as trace:
+            if not self._api_key:
+                vectors = [local_embedding(text, self._local_embedding_dimensions) for text in texts]
+                trace.update(output={"vector_count": len(vectors), "mode": "local-fallback"})
+                return vectors
 
-        last_error: RuntimeError | None = None
-        for attempt in range(1, self._embedding_max_retries + 1):
-            try:
-                response = self._client.post(
-                    "https://api.openai.com/v1/embeddings",
-                    headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
-                    json={"model": model, "input": list(texts)},
-                )
-            except httpx.TimeoutException as exc:
-                last_error = RuntimeError(f"Embedding request timed out on attempt {attempt}.")
-                if attempt < self._embedding_max_retries:
-                    self._sleep_before_retry(attempt)
-                    continue
-                raise last_error from exc
-            except httpx.RequestError as exc:
-                last_error = RuntimeError(f"Embedding request failed on attempt {attempt}: {exc}")
-                if attempt < self._embedding_max_retries:
-                    self._sleep_before_retry(attempt)
-                    continue
-                raise last_error from exc
+            last_error: RuntimeError | None = None
+            for attempt in range(1, self._embedding_max_retries + 1):
+                try:
+                    response = self._client.post(
+                        "https://api.openai.com/v1/embeddings",
+                        headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
+                        json={"model": model, "input": list(texts)},
+                    )
+                except httpx.TimeoutException as exc:
+                    last_error = RuntimeError(f"Embedding request timed out on attempt {attempt}.")
+                    trace.update(metadata={"attempt": attempt, "status": "timeout"})
+                    if attempt < self._embedding_max_retries:
+                        self._sleep_before_retry(attempt)
+                        continue
+                    raise last_error from exc
+                except httpx.RequestError as exc:
+                    last_error = RuntimeError(f"Embedding request failed on attempt {attempt}: {exc}")
+                    trace.update(metadata={"attempt": attempt, "status": "request_error"})
+                    if attempt < self._embedding_max_retries:
+                        self._sleep_before_retry(attempt)
+                        continue
+                    raise last_error from exc
 
-            if response.is_success:
-                data = response.json()
-                return [item["embedding"] for item in data.get("data", [])]
+                if response.is_success:
+                    data = response.json()
+                    vectors = [item["embedding"] for item in data.get("data", [])]
+                    trace.update(
+                        output={
+                            "vector_count": len(vectors),
+                            "mode": "openai",
+                            "attempt": attempt,
+                        }
+                    )
+                    return vectors
 
-            if response.status_code in {408, 409, 429} or response.status_code >= 500:
-                last_error = RuntimeError(
-                    f"Embedding request returned retriable status {response.status_code} on attempt {attempt}."
-                )
-                if attempt < self._embedding_max_retries:
-                    self._sleep_before_retry(attempt)
-                    continue
+                if response.status_code in {408, 409, 429} or response.status_code >= 500:
+                    last_error = RuntimeError(
+                        f"Embedding request returned retriable status {response.status_code} on attempt {attempt}."
+                    )
+                    trace.update(metadata={"attempt": attempt, "status_code": response.status_code, "status": "retryable_http_error"})
+                    if attempt < self._embedding_max_retries:
+                        self._sleep_before_retry(attempt)
+                        continue
 
-            raise RuntimeError(f"Failed to embed texts: {response.status_code} {response.text}")
+                raise RuntimeError(f"Failed to embed texts: {response.status_code} {response.text}")
 
-        raise last_error or RuntimeError("Failed to embed texts after retries.")
+            raise last_error or RuntimeError("Failed to embed texts after retries.")
 
     def generate_answer(self, question: str, hits: Sequence[SearchHit], model: str, max_context_characters: int) -> str:
-        if not hits:
-            return "I could not find enough evidence in the indexed corpus to answer this question."
-        if not self._api_key:
-            return fallback_answer(question, hits)
-
-        context = build_context(hits, max_context_characters=max_context_characters)
-        system_prompt = (
-            "You answer questions about a codebase using only provided evidence. "
-            "If evidence is insufficient, clearly say so. "
-            "Keep the answer concise and include citations in format [path:start-end]."
-        )
-        user_prompt = f"Question:\n{question}\n\nEvidence:\n{context}"
-
-        response = self._client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "temperature": 0.1,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+        with self._generation_trace(
+            name="openai.chat_completion",
+            model=model,
+            input={
+                "question": question,
+                "hit_count": len(hits),
+                "top_citations": [f"{hit.source_path}:{hit.line_start}-{hit.line_end}" for hit in hits[:3]],
             },
-        )
-        if not response.is_success:
-            return fallback_answer(question, hits)
+            metadata={"provider": "openai", "uses_remote_model": bool(self._api_key)},
+            model_parameters={"temperature": 0.1},
+        ) as trace:
+            if not hits:
+                answer = "I could not find enough evidence in the indexed corpus to answer this question."
+                trace.update(output={"mode": "no_hits", "answer_preview": answer[:500]})
+                return answer
+            if not self._api_key:
+                answer = fallback_answer(question, hits)
+                trace.update(output={"mode": "local-fallback", "answer_preview": answer[:500]})
+                return answer
 
-        data = response.json()
-        choices = data.get("choices", [])
-        if not choices:
-            return fallback_answer(question, hits)
-        return choices[0].get("message", {}).get("content", "").strip() or fallback_answer(question, hits)
+            context = build_context(hits, max_context_characters=max_context_characters)
+            system_prompt = (
+                "You answer questions about a codebase using only provided evidence. "
+                "If evidence is insufficient, clearly say so. "
+                "Keep the answer concise and include citations in format [path:start-end]."
+            )
+            user_prompt = f"Question:\n{question}\n\nEvidence:\n{context}"
+
+            response = self._client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "temperature": 0.1,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                },
+            )
+            if not response.is_success:
+                answer = fallback_answer(question, hits)
+                trace.update(
+                    output={
+                        "mode": "fallback_http_error",
+                        "status_code": response.status_code,
+                        "answer_preview": answer[:500],
+                    }
+                )
+                return answer
+
+            data = response.json()
+            choices = data.get("choices", [])
+            if not choices:
+                answer = fallback_answer(question, hits)
+                trace.update(output={"mode": "fallback_empty_choices", "answer_preview": answer[:500]})
+                return answer
+            answer = choices[0].get("message", {}).get("content", "").strip() or fallback_answer(question, hits)
+            trace.update(output={"mode": "openai", "answer_preview": answer[:500], "choice_count": len(choices)})
+            return answer
 
     def _sleep_before_retry(self, attempt: int) -> None:
         backoff_seconds = self._embedding_retry_backoff_seconds * (2 ** (attempt - 1))
         time.sleep(backoff_seconds)
+
+    @contextmanager
+    def _generation_trace(
+        self,
+        *,
+        name: str,
+        model: str,
+        input: dict[str, object],
+        metadata: dict[str, object] | None = None,
+        model_parameters: dict[str, object] | None = None,
+    ):
+        if not self._tracer:
+            yield _NullTrace()
+            return
+        with self._tracer.generation(
+            name=name,
+            model=model,
+            input=input,
+            metadata=metadata,
+            model_parameters=model_parameters,
+        ) as trace:
+            yield trace
+
+
+class _NullTrace:
+    def update(self, **kwargs: object) -> None:  # pragma: no cover - trivial no-op
+        return
 
 
 def build_context(hits: Sequence[SearchHit], max_context_characters: int) -> str:

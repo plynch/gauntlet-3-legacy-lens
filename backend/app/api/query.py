@@ -31,6 +31,7 @@ def run_query(payload: QueryRequest) -> QueryResponse:
                 settings=services.settings,
                 qdrant=services.qdrant,
                 openai_gateway=services.openai_gateway,
+                tracer=getattr(services, "tracer", None),
             )
             return query_service.answer(question=payload.question, top_k=payload.top_k)
     except Exception as exc:  # pragma: no cover - handled by integration testing
@@ -45,6 +46,7 @@ def run_ingest(mode: Literal["full", "incremental"] = "incremental") -> IngestSt
                 settings=services.settings,
                 qdrant=services.qdrant,
                 openai_gateway=services.openai_gateway,
+                tracer=getattr(services, "tracer", None),
             )
             return ingestion_service.ingest(mode=mode)
     except Exception as exc:  # pragma: no cover - handled by integration testing
@@ -77,6 +79,7 @@ def sourceforge_full_ingest() -> SourceForgeFullIngestResponse:
                 settings=services.settings,
                 qdrant=services.qdrant,
                 openai_gateway=services.openai_gateway,
+                tracer=getattr(services, "tracer", None),
             )
             ingest_stats = ingestion_service.ingest(mode="full")
         return SourceForgeFullIngestResponse(sync=sync_stats, ingest=ingest_stats)
@@ -95,6 +98,7 @@ def run_feature_query(feature_key: str, payload: FeatureQueryRequest) -> QueryRe
                 settings=services.settings,
                 qdrant=services.qdrant,
                 openai_gateway=services.openai_gateway,
+                tracer=getattr(services, "tracer", None),
             )
             question = build_feature_question(feature_key, payload.subject)
             return query_service.answer(question=question, top_k=payload.top_k)
