@@ -221,6 +221,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
         Recommended flow: <strong>Sync SourceForge + Reindex</strong> first, then use <strong>Index changes</strong>{' '}
         for routine updates.
       </p>
+      <p className="muted-note">Full ingest can take 5-10 minutes for the current GnuCOBOL trunk (~572K LOC).</p>
 
       {pipelinePhase !== 'idle' ? (
         <div className="progress-panel" aria-live="polite">
