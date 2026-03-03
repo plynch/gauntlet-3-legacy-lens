@@ -1,5 +1,7 @@
 # Railway Runbook
 
+Canonical environment URLs live in `docs/environments.md`.
+
 ## Environment Strategy
 
 1. One Railway project with two environments:

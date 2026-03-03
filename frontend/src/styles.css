@@ -37,10 +37,24 @@ textarea {
   font: inherit;
 }
 
+input,
+select {
+  font: inherit;
+}
+
 textarea {
   width: 100%;
   min-height: 96px;
   padding: 0.65rem;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  margin-top: 0.35rem;
 }
 
 button {

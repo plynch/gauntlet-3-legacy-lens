@@ -82,3 +82,39 @@ def test_post_ingest_route_returns_stats(monkeypatch) -> None:
     payload = response.json()
     assert payload["files_seen"] == 10
     assert payload["chunks_indexed"] == 42
+
+
+def test_get_features_route_returns_catalog() -> None:
+    response = client.get("/api/features")
+
+    assert response.status_code == 200
+    payload = response.json()
+    keys = {item["key"] for item in payload["features"]}
+    assert "code_explanation" in keys
+    assert "dependency_mapping" in keys
+
+
+def test_post_feature_query_route_uses_feature_question(monkeypatch) -> None:
+    response_payload = QueryResponse(
+        question="Explain section READ-CUSTOMER",
+        answer="READ-CUSTOMER handles file reads with EOF checks.",
+        insufficient_evidence=False,
+        snippets=[],
+        citations=[],
+    )
+    captured: dict[str, str] = {}
+
+    class CapturingQueryService(FakeQueryService):
+        def answer(self, question: str, top_k: int | None = None) -> QueryResponse:
+            captured["question"] = question
+            return response_payload
+
+    monkeypatch.setattr(query_api, "runtime_services", fake_runtime_services)
+    monkeypatch.setattr(query_api, "QueryService", lambda **_: CapturingQueryService(response_payload))
+
+    response = client.post("/api/features/code_explanation/query", json={"subject": "READ-CUSTOMER"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer"]
+    assert "READ-CUSTOMER" in captured["question"]

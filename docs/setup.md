@@ -1,5 +1,7 @@
 # LegacyLens Setup Guide
 
+Canonical environment URLs live in `docs/environments.md`.
+
 ## Local Setup (Docker)
 
 1. Start services:

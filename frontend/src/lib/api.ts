@@ -38,6 +38,18 @@ export interface IngestStats {
   chunks_indexed: number
 }
 
+export interface FeatureDefinition {
+  key: string
+  title: string
+  description: string
+  requires_subject: boolean
+  example_subject?: string | null
+}
+
+export interface FeatureListResponse {
+  features: FeatureDefinition[]
+}
+
 const fallbackApiBase = 'http://localhost:8000'
 
 type RuntimeConfig = {
@@ -93,7 +105,9 @@ export function buildSourceLink(path: string, lineStart: number, lineEnd: number
     return null
   }
 
-  const normalizedPath = path
+  const repoPath = path.startsWith('data/') ? `backend/${path}` : path
+
+  const normalizedPath = repoPath
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/")
@@ -139,6 +153,44 @@ export async function runIngest(mode: 'full' | 'incremental' = 'incremental'): P
 
   if (!response.ok) {
     let detail = `Ingest endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep default message if response body is not JSON.
+    }
+    throw new Error(detail)
+  }
+
+  return response.json()
+}
+
+export async function getFeatures(): Promise<FeatureDefinition[]> {
+  const response = await fetch(`${getApiBase()}/api/features`)
+
+  if (!response.ok) {
+    throw new Error(`Features endpoint returned ${response.status}`)
+  }
+
+  const payload = (await response.json()) as FeatureListResponse
+  return payload.features
+}
+
+export async function runFeatureQuery(
+  featureKey: string,
+  subject?: string,
+  topK?: number,
+): Promise<QueryResponse> {
+  const response = await fetch(`${getApiBase()}/api/features/${featureKey}/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject, top_k: topK }),
+  })
+
+  if (!response.ok) {
+    let detail = `Feature query endpoint returned ${response.status}`
     try {
       const payload = (await response.json()) as { detail?: string }
       if (payload.detail) {

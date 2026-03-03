@@ -3,14 +3,21 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 
 from app.core.settings import Settings
+from app.models.features import FeatureListResponse, FeatureQueryRequest
 from app.models.ingest import IngestStats
 from app.models.query import QueryRequest, QueryResponse
+from app.services.feature_catalog import build_feature_question, has_feature, list_features
 from app.services.ingestion_service import IngestionService
 from app.services.query_service import QueryService
 from app.services.runtime import runtime_services
 
 router = APIRouter()
 settings = Settings()
+
+
+@router.get("/features", response_model=FeatureListResponse)
+def get_features() -> FeatureListResponse:
+    return FeatureListResponse(features=list_features())
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -39,3 +46,21 @@ def run_ingest(mode: Literal["full", "incremental"] = "incremental") -> IngestSt
             return ingestion_service.ingest(mode=mode)
     except Exception as exc:  # pragma: no cover - handled by integration testing
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
+
+
+@router.post("/features/{feature_key}/query", response_model=QueryResponse)
+def run_feature_query(feature_key: str, payload: FeatureQueryRequest) -> QueryResponse:
+    if not has_feature(feature_key):
+        raise HTTPException(status_code=404, detail=f"Unknown feature: {feature_key}")
+
+    try:
+        with runtime_services(settings) as services:
+            query_service = QueryService(
+                settings=services.settings,
+                qdrant=services.qdrant,
+                openai_gateway=services.openai_gateway,
+            )
+            question = build_feature_question(feature_key, payload.subject)
+            return query_service.answer(question=question, top_k=payload.top_k)
+    except Exception as exc:  # pragma: no cover - handled by integration testing
+        raise HTTPException(status_code=500, detail=f"Feature query failed: {exc}") from exc
