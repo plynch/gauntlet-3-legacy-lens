@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+:root {
+  --bg-canvas: #e8e2cd;
+  --bg-canvas-deep: #d8cfb0;
+  --surface: #fbf8ed;
+  --surface-strong: #f4efde;
+  --border: #bcae84;
+  --border-soft: #d8ceb0;
+  --text: #1f2b1f;
+  --text-muted: #55614a;
+  --brand: #2e5d3c;
+  --brand-strong: #234b30;
+  --brand-soft: #d8e6da;
+  --accent: #8b6532;
+  --code-bg: #132218;
+  --code-border: #1f3828;
+  --code-text: #e7f4e7;
+  --danger-bg: #fef2f2;
+  --danger-border: #efb4b4;
+  --danger-text: #8f2f2f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255, 255, 255, 0.4), transparent 50%),
+    linear-gradient(165deg, var(--bg-canvas), var(--bg-canvas-deep));
+  padding: 1.5rem;
+}
+
+a {
+  color: var(--brand-strong);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: 'Bitter', Georgia, serif;
+  color: #1c311f;
+}
+
+p {
+  margin: 0.55rem 0 0;
+}
+
+button,
+textarea,
+input,
+select {
+  font: inherit;
+}

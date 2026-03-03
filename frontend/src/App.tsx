@@ -145,6 +145,7 @@ function App() {
   return (
     <main className="shell app-shell">
       <header className="app-header">
+        <p className="app-kicker">GnuCOBOL Retrieval Console</p>
         <h1>LegacyLens</h1>
         <p>
           LegacyLens is a retrieval-augmented analysis tool for the GnuCOBOL codebase, designed to answer architecture
@@ -160,7 +161,7 @@ function App() {
 
       <div className="workspace">
         <div className="query-column">
-          <section className="query-panel">
+          <section className="query-panel surface-card">
             <h2>Query</h2>
             <form onSubmit={onSubmit}>
               <label htmlFor="query">Ask about the codebase</label>
@@ -182,7 +183,7 @@ function App() {
           </section>
 
           {queryResult ? (
-            <section>
+            <section className="surface-card answer-surface">
               <h2>Answer</h2>
               <pre className="answer-text">{renderAnswerWithLinks(queryResult.answer)}</pre>
               {queryResult.insufficient_evidence ? <p>Evidence confidence: low</p> : null}
@@ -190,7 +191,7 @@ function App() {
               {queryResult.citations.length > 0 ? (
                 <>
                   <h3>Citations</h3>
-                  <ul>
+                  <ul className="citation-list">
                     {queryResult.citations.map((citation, index) => {
                       const sourceLink = buildSourceLink(citation.path, citation.line_start, citation.line_end)
                       const label = `[${index + 1}] ${citation.path}:${citation.line_start}-${citation.line_end}`
@@ -222,9 +223,10 @@ function App() {
                     )
                     return (
                       <article
+                        className="snippet-card"
                         key={`${snippet.citation.path}-${snippet.citation.line_start}-${snippet.citation.line_end}`}
                       >
-                        <p>
+                        <p className="snippet-meta">
                           <strong>
                             {sourceLink ? (
                               <a href={sourceLink} target="_blank" rel="noreferrer">
@@ -236,7 +238,7 @@ function App() {
                           </strong>{' '}
                           score {snippet.score.toFixed(3)}
                         </p>
-                        <pre>{snippet.text}</pre>
+                        <pre className="snippet-code">{snippet.text}</pre>
                       </article>
                     )
                   })}
