@@ -6,7 +6,9 @@ RAG application for understanding legacy COBOL code with grounded evidence.
 
 - FastAPI backend with:
   - `GET /api/health`
+  - `POST /api/corpus/sourceforge/full-ingest`
   - `POST /api/ingest` (`mode=full|incremental`)
+  - `GET /api/ingest/runs`
   - `POST /api/query`
 - React frontend with:
   - Health status panel
@@ -22,6 +24,8 @@ RAG application for understanding legacy COBOL code with grounded evidence.
 3. Environment URLs and vars: `docs/environments.md`
 4. Railway runbook: `docs/railway-runbook.md`
 5. Evaluation process: `docs/evaluation.md`
+6. Ingest benchmarks: `docs/ingest-benchmarks.md`
+7. Corpus source of truth: `docs/corpus-source.md`
 
 ## Run locally
 
@@ -33,6 +37,12 @@ Then open:
 
 - Frontend: `http://localhost:4173`
 - API health: `http://localhost:8000/api/health`
+
+Sync latest GnuCOBOL trunk corpus before ingest:
+
+```bash
+./scripts/fetch-sourceforge-trunk.sh
+```
 
 ## Testing and quality checks
 
@@ -79,13 +89,21 @@ npm run build
 
 ## API quickstart
 
-1. Index corpus:
+1. Sync SourceForge trunk + full ingest in one call:
+
+```bash
+curl -X POST 'http://localhost:8000/api/corpus/sourceforge/full-ingest'
+```
+
+2. (Optional) run direct ingest only:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/ingest?mode=full'
 ```
 
-2. Ask a question:
+Every ingest response now includes benchmark telemetry (`started_at`, `completed_at`, `duration_seconds`, `corpus_loc`, `corpus_bytes`), and each run is appended to `backend/data/benchmarks/ingest_runs.jsonl` (or `data/benchmarks/ingest_runs.jsonl` in container runtime).
+
+3. Ask a question:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/query' \
@@ -93,7 +111,7 @@ curl -X POST 'http://localhost:8000/api/query' \
   -d '{"question":"Where is file IO handled?"}'
 ```
 
-3. Run a feature query:
+4. Run a feature query:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/features/code_explanation/query' \
@@ -102,3 +120,9 @@ curl -X POST 'http://localhost:8000/api/features/code_explanation/query' \
 ```
 
 Feature query endpoints are available for advanced workflows, but intentionally not shown in the default UI.
+
+5. Review benchmark history:
+
+```bash
+curl 'http://localhost:8000/api/ingest/runs?limit=20'
+```

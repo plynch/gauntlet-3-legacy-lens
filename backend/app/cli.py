@@ -33,7 +33,7 @@ def run_ingest(mode: Literal["full", "incremental"]) -> None:
             openai_gateway=services.openai_gateway,
         )
         stats = ingestion_service.ingest(mode=mode)
-    print(json.dumps(stats.model_dump(), indent=2))
+    print(json.dumps(stats.model_dump(mode="json"), indent=2))
 
 
 if __name__ == "__main__":

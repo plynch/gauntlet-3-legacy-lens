@@ -22,12 +22,13 @@ class Settings(BaseSettings):
     local_embedding_dimensions: int = 256
     query_top_k: int = 5
     max_context_characters: int = 9000
-    source_directories: list[str] = Field(
-        default_factory=lambda: ["backend/data/corpus", "data/corpus", "corpus"]
-    )
+    source_directories: list[str] = Field(default_factory=lambda: ["data/corpus/sourceforge-trunk"])
     source_extensions: list[str] = Field(default_factory=lambda: [".cbl", ".cob", ".cpy", ".copy"])
     chunk_max_lines: int = 80
     chunk_overlap_lines: int = 16
+    ingest_benchmark_log_path: str = "data/benchmarks/ingest_runs.jsonl"
+    ingest_benchmark_read_limit: int = 50
+    sourceforge_sync_timeout_seconds: int = 120
 
     model_config = SettingsConfigDict(
         env_prefix="LEGACYLENS_",

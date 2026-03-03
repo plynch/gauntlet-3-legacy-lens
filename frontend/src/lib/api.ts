@@ -32,10 +32,30 @@ export interface QueryResponse {
 }
 
 export interface IngestStats {
+  mode: 'full' | 'incremental'
+  started_at: string
+  completed_at: string
+  duration_seconds: number
   files_seen: number
   files_indexed: number
   files_skipped: number
   chunks_indexed: number
+  corpus_bytes: number
+  corpus_loc: number
+}
+
+export interface SourceForgeSyncStats {
+  source_url: string
+  destination_path: string
+  synced_at: string
+  files_synced: number
+  corpus_loc: number
+  corpus_bytes: number
+}
+
+export interface SourceForgeFullIngestResponse {
+  sync: SourceForgeSyncStats
+  ingest: IngestStats
 }
 
 export interface FeatureDefinition {
@@ -153,6 +173,25 @@ export async function runIngest(mode: 'full' | 'incremental' = 'incremental'): P
 
   if (!response.ok) {
     let detail = `Ingest endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep default message if response body is not JSON.
+    }
+    throw new Error(detail)
+  }
+
+  return response.json()
+}
+
+export async function runSourceForgeFullIngest(): Promise<SourceForgeFullIngestResponse> {
+  const response = await fetch(`${getApiBase()}/api/corpus/sourceforge/full-ingest`, { method: 'POST' })
+
+  if (!response.ok) {
+    let detail = `SourceForge full ingest endpoint returned ${response.status}`
     try {
       const payload = (await response.json()) as { detail?: string }
       if (payload.detail) {

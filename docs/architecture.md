@@ -3,6 +3,8 @@
 ## System Overview
 
 LegacyLens is a staging-first RAG application for legacy COBOL code understanding.
+Corpus source of truth is GnuCOBOL SourceForge trunk:
+`https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/`.
 
 1. Frontend (`React + TypeScript`) provides:
 - health check
@@ -10,10 +12,13 @@ LegacyLens is a staging-first RAG application for legacy COBOL code understandin
 - free-form query UI with citations and snippets
 2. Backend (`FastAPI`) provides:
 - `GET /api/health`
+- `POST /api/corpus/sourceforge/sync`
+- `POST /api/corpus/sourceforge/full-ingest`
 - `GET /api/features`
 - `POST /api/features/{feature_key}/query`
 - `POST /api/query`
 - `POST /api/ingest?mode=full|incremental`
+- `GET /api/ingest/runs`
 3. Vector store (`Qdrant`) stores chunk vectors + metadata.
 
 ## Request Flow
@@ -28,6 +33,10 @@ LegacyLens is a staging-first RAG application for legacy COBOL code understandin
 - deterministic local fallback when key is absent
 5. Upsert points into Qdrant.
 6. Incremental mode skips unchanged files via hash match.
+
+Configured corpus path is a single directory:
+
+1. `data/corpus/sourceforge-trunk`
 
 ## Query
 

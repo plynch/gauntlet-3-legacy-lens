@@ -48,6 +48,8 @@ def run_queries(api_base: str, query_specs: list[dict[str, Any]]) -> dict[str, A
     for spec in query_specs:
         question = str(spec["question"])
         expected_paths = [str(path) for path in spec.get("expected_paths", [])]
+        expected_path_contains = [str(item) for item in spec.get("expected_path_contains", [])]
+        expected_set = set(expected_paths)
 
         started = time.perf_counter()
         payload = post_json(
@@ -60,12 +62,12 @@ def run_queries(api_base: str, query_specs: list[dict[str, Any]]) -> dict[str, A
 
         snippets = payload.get("snippets", [])[:5]
         snippet_paths = [str(item.get("citation", {}).get("path", "")) for item in snippets]
-        relevant_count = count_relevant(snippet_paths, expected_paths)
+        relevant_count = count_relevant(snippet_paths, expected_set, expected_path_contains)
         precision_at_5 = relevant_count / 5.0
         precision_scores.append(precision_at_5)
 
         citation_paths = [str(item.get("path", "")) for item in payload.get("citations", [])]
-        citation_match = has_expected_path(citation_paths, expected_paths)
+        citation_match = has_expected_path(citation_paths, expected_set, expected_path_contains)
         if citation_match:
             citation_hits += 1
 
@@ -91,14 +93,19 @@ def run_queries(api_base: str, query_specs: list[dict[str, Any]]) -> dict[str, A
     }
 
 
-def count_relevant(paths: list[str], expected_paths: list[str]) -> int:
-    expected_set = set(expected_paths)
-    return sum(1 for path in paths if path in expected_set)
+def count_relevant(paths: list[str], expected_paths: set[str], expected_path_contains: list[str]) -> int:
+    return sum(1 for path in paths if path_matches(path, expected_paths, expected_path_contains))
 
 
-def has_expected_path(paths: list[str], expected_paths: list[str]) -> bool:
-    expected_set = set(expected_paths)
-    return any(path in expected_set for path in paths)
+def has_expected_path(paths: list[str], expected_paths: set[str], expected_path_contains: list[str]) -> bool:
+    return any(path_matches(path, expected_paths, expected_path_contains) for path in paths)
+
+
+def path_matches(path: str, expected_paths: set[str], expected_path_contains: list[str]) -> bool:
+    if path in expected_paths:
+        return True
+
+    return any(fragment in path for fragment in expected_path_contains)
 
 
 def percentile(values: list[float], value: int) -> float:

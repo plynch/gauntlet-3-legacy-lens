@@ -27,3 +27,6 @@ coverage/
 
 # Logs
 *.log
+backend/data/benchmarks/*.jsonl
+backend/data/corpus/sourceforge-trunk/*
+!backend/data/corpus/sourceforge-trunk/.gitkeep

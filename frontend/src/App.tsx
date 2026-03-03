@@ -6,6 +6,7 @@ import {
   buildSourceLink,
   getHealth,
   runIngest,
+  runSourceForgeFullIngest,
   runQuery,
 } from './lib/api'
 
@@ -27,6 +28,12 @@ function formatIngestSummary(stats: IngestStats, mode: IngestMode | null): strin
   return `Indexed ${stats.files_indexed}/${stats.files_seen} files and ${stats.chunks_indexed} chunks (${stats.files_skipped} skipped).`
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
 function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [healthLoading, setHealthLoading] = useState(false)
@@ -39,6 +46,8 @@ function App() {
   const [ingestError, setIngestError] = useState<string>('')
   const [ingestStats, setIngestStats] = useState<IngestStats | null>(null)
   const [lastIngestMode, setLastIngestMode] = useState<IngestMode | null>(null)
+  const [syncSummary, setSyncSummary] = useState<string>('')
+  const [sourceforgeFullIngestLoading, setSourceforgeFullIngestLoading] = useState(false)
 
   async function loadHealth() {
     setHealthLoading(true)
@@ -86,6 +95,8 @@ function App() {
     setLastIngestMode(mode)
     setIngestError('')
     setIngestStats(null)
+    setSyncSummary('')
+    setSourceforgeFullIngestLoading(false)
 
     try {
       const stats = await runIngest(mode)
@@ -93,6 +104,30 @@ function App() {
     } catch (err: unknown) {
       setIngestError(err instanceof Error ? err.message : 'Ingestion failed')
     } finally {
+      setIngestLoadingMode(null)
+    }
+  }
+
+  async function onSourceForgeFullIngestClick() {
+    setIngestLoadingMode('full')
+    setSourceforgeFullIngestLoading(true)
+    setLastIngestMode('full')
+    setIngestError('')
+    setIngestStats(null)
+    setSyncSummary('')
+
+    try {
+      const response = await runSourceForgeFullIngest()
+      setIngestStats(response.ingest)
+      setSyncSummary(
+        `Synced SourceForge trunk (${response.sync.files_synced} files, ${response.sync.corpus_loc} LOC) at ${new Date(
+          response.sync.synced_at,
+        ).toLocaleString()}.`,
+      )
+    } catch (err: unknown) {
+      setIngestError(err instanceof Error ? err.message : 'SourceForge full ingest failed')
+    } finally {
+      setSourceforgeFullIngestLoading(false)
       setIngestLoadingMode(null)
     }
   }
@@ -132,14 +167,34 @@ function App() {
           >
             {ingestLoadingMode === 'full' ? 'Reindexing...' : 'Reindex all'}
           </button>
+          <button
+            className="secondary-button"
+            onClick={onSourceForgeFullIngestClick}
+            disabled={ingestLoadingMode !== null}
+          >
+            {sourceforgeFullIngestLoading ? 'Syncing + reindexing...' : 'Sync SourceForge + Reindex'}
+          </button>
         </div>
         <p className="muted-note">
-          Use <strong>Index changes</strong> for normal use. Use <strong>Reindex all</strong> after chunking/model
-          changes.
+          Use <strong>Sync SourceForge + Reindex</strong> to pull latest upstream trunk and run a full ingest in one
+          step.
         </p>
         <div>
           {ingestError ? <p role="alert">Indexing issue: {ingestError}</p> : null}
-          {ingestStats ? <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p> : null}
+          {syncSummary ? <p>{syncSummary}</p> : null}
+          {ingestStats ? (
+            <>
+              <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p>
+              <ul className="health-list">
+                <li>Mode: {ingestStats.mode}</li>
+                <li>Started: {new Date(ingestStats.started_at).toLocaleString()}</li>
+                <li>Completed: {new Date(ingestStats.completed_at).toLocaleString()}</li>
+                <li>Duration: {ingestStats.duration_seconds.toFixed(2)}s</li>
+                <li>Corpus LOC: {ingestStats.corpus_loc}</li>
+                <li>Corpus size: {formatBytes(ingestStats.corpus_bytes)}</li>
+              </ul>
+            </>
+          ) : null}
         </div>
       </section>
 

@@ -1,6 +1,7 @@
 # LegacyLens Setup Guide
 
 Canonical environment URLs live in `docs/environments.md`.
+Canonical corpus source lives in `docs/corpus-source.md`.
 
 ## Local Setup (Docker)
 
@@ -14,13 +15,25 @@ docker compose up --build
 - Frontend: `http://localhost:4173`
 - API health: `http://localhost:8000/api/health`
 
-3. Index the local sample corpus:
+3. Sync latest GnuCOBOL SourceForge trunk snapshot:
+
+```bash
+./scripts/fetch-sourceforge-trunk.sh
+```
+
+4. Sync SourceForge trunk + full ingest:
+
+```bash
+curl -X POST 'http://localhost:8000/api/corpus/sourceforge/full-ingest'
+```
+
+5. (Optional) direct ingest only:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/ingest?mode=full'
 ```
 
-4. Query:
+6. Query:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/query' \
@@ -68,6 +81,11 @@ Recommended workflow:
 1. Keep local `.env.staging` and `.env.production` files updated from templates.
 2. When variables change, paste the relevant file contents into Railway service variables.
 3. Treat Railway as runtime source of truth; keep templates in git for reproducibility.
+
+Corpus workflow:
+
+1. LegacyLens ingests only `data/corpus/sourceforge-trunk`.
+2. Keep that directory synced from SourceForge trunk with `./scripts/fetch-sourceforge-trunk.sh`.
 
 ## Railway Setup
 

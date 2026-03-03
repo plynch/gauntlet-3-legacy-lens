@@ -1,9 +1,11 @@
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
 import app.api.query as query_api
 from app.main import app
+from app.models.corpus import SourceForgeSyncStats
 from app.models.ingest import IngestStats
 from app.models.query import Citation, QueryResponse, RetrievedSnippet
 
@@ -71,7 +73,18 @@ def test_post_query_route_returns_contract(monkeypatch) -> None:
 
 
 def test_post_ingest_route_returns_stats(monkeypatch) -> None:
-    stats_payload = IngestStats(files_seen=10, files_indexed=8, files_skipped=2, chunks_indexed=42)
+    stats_payload = IngestStats(
+        mode="incremental",
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+        duration_seconds=1.2,
+        files_seen=10,
+        files_indexed=8,
+        files_skipped=2,
+        chunks_indexed=42,
+        corpus_bytes=2048,
+        corpus_loc=120,
+    )
 
     monkeypatch.setattr(query_api, "runtime_services", fake_runtime_services)
     monkeypatch.setattr(query_api, "IngestionService", lambda **_: FakeIngestionService(stats_payload))
@@ -82,6 +95,83 @@ def test_post_ingest_route_returns_stats(monkeypatch) -> None:
     payload = response.json()
     assert payload["files_seen"] == 10
     assert payload["chunks_indexed"] == 42
+    assert payload["corpus_loc"] == 120
+
+
+def test_get_ingest_runs_route_returns_history(monkeypatch) -> None:
+    stats_payload = IngestStats(
+        mode="full",
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+        duration_seconds=2.4,
+        files_seen=2,
+        files_indexed=2,
+        files_skipped=0,
+        chunks_indexed=11,
+        corpus_bytes=4096,
+        corpus_loc=300,
+    )
+    monkeypatch.setattr(query_api, "read_ingest_runs", lambda _path, limit=20: [stats_payload])
+
+    response = client.get("/api/ingest/runs?limit=5")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["mode"] == "full"
+    assert payload[0]["corpus_bytes"] == 4096
+
+
+def test_sync_sourceforge_route_returns_stats(monkeypatch) -> None:
+    sync_payload = SourceForgeSyncStats(
+        source_url="https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/",
+        destination_path="data/corpus/sourceforge-trunk",
+        synced_at=datetime.now(timezone.utc),
+        files_synced=50,
+        corpus_loc=10000,
+        corpus_bytes=200000,
+    )
+    monkeypatch.setattr(query_api, "sync_sourceforge_trunk", lambda *_args, **_kwargs: sync_payload)
+
+    response = client.post("/api/corpus/sourceforge/sync")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["files_synced"] == 50
+    assert payload["corpus_loc"] == 10000
+
+
+def test_sourceforge_full_ingest_route_returns_sync_and_ingest(monkeypatch) -> None:
+    sync_payload = SourceForgeSyncStats(
+        source_url="https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/",
+        destination_path="data/corpus/sourceforge-trunk",
+        synced_at=datetime.now(timezone.utc),
+        files_synced=50,
+        corpus_loc=10000,
+        corpus_bytes=200000,
+    )
+    ingest_payload = IngestStats(
+        mode="full",
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+        duration_seconds=12.3,
+        files_seen=50,
+        files_indexed=50,
+        files_skipped=0,
+        chunks_indexed=1234,
+        corpus_bytes=200000,
+        corpus_loc=10000,
+    )
+    monkeypatch.setattr(query_api, "sync_sourceforge_trunk", lambda *_args, **_kwargs: sync_payload)
+    monkeypatch.setattr(query_api, "runtime_services", fake_runtime_services)
+    monkeypatch.setattr(query_api, "IngestionService", lambda **_: FakeIngestionService(ingest_payload))
+
+    response = client.post("/api/corpus/sourceforge/full-ingest")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sync"]["files_synced"] == 50
+    assert payload["ingest"]["chunks_indexed"] == 1234
 
 
 def test_get_features_route_returns_catalog() -> None:

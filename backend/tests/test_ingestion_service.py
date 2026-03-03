@@ -43,8 +43,11 @@ def make_chunk(source_path: str, file_hash: str) -> SourceChunk:
     )
 
 
-def test_ingest_incremental_skips_matching_file_hash() -> None:
-    settings = Settings(source_directories="corpus")
+def test_ingest_incremental_skips_matching_file_hash(tmp_path) -> None:
+    settings = Settings(
+        source_directories="corpus",
+        ingest_benchmark_log_path=str(tmp_path / "benchmarks" / "ingest_runs.jsonl"),
+    )
     qdrant = FakeQdrantGateway(should_skip=True)
     service = IngestionService(settings=settings, qdrant=qdrant, openai_gateway=FakeOpenAIGateway())  # type: ignore[arg-type]
 
@@ -60,8 +63,11 @@ def test_ingest_incremental_skips_matching_file_hash() -> None:
     assert qdrant.upsert_calls == 0
 
 
-def test_ingest_full_indexes_chunks_and_creates_collection_once() -> None:
-    settings = Settings(source_directories="corpus")
+def test_ingest_full_indexes_chunks_and_creates_collection_once(tmp_path) -> None:
+    settings = Settings(
+        source_directories="corpus",
+        ingest_benchmark_log_path=str(tmp_path / "benchmarks" / "ingest_runs.jsonl"),
+    )
     qdrant = FakeQdrantGateway(should_skip=False)
     service = IngestionService(settings=settings, qdrant=qdrant, openai_gateway=FakeOpenAIGateway())  # type: ignore[arg-type]
 
@@ -92,8 +98,11 @@ def test_ingest_full_indexes_chunks_and_creates_collection_once() -> None:
     assert qdrant.upsert_calls == 2
 
 
-def test_ingest_skips_when_no_chunks_emitted() -> None:
-    settings = Settings(source_directories="corpus")
+def test_ingest_skips_when_no_chunks_emitted(tmp_path) -> None:
+    settings = Settings(
+        source_directories="corpus",
+        ingest_benchmark_log_path=str(tmp_path / "benchmarks" / "ingest_runs.jsonl"),
+    )
     qdrant = FakeQdrantGateway(should_skip=False)
     service = IngestionService(settings=settings, qdrant=qdrant, openai_gateway=FakeOpenAIGateway())  # type: ignore[arg-type]
 

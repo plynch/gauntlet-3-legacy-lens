@@ -37,3 +37,11 @@ python3 scripts/eval/run_eval.py \
 2. Mean precision@5.
 3. Citation match rate.
 4. Per-query breakdown table.
+
+## Query Spec Format
+
+Each query JSON row supports:
+
+1. `question` (required)
+2. `expected_paths` (optional exact path matches)
+3. `expected_path_contains` (optional path-fragment matches; recommended for SourceForge trunk snapshots)

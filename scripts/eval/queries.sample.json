@@ -1,18 +1,18 @@
 [
   {
-    "question": "Where does this program open files?",
-    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+    "question": "Where is numeric dump behavior implemented?",
+    "expected_path_contains": ["numeric-dump.cob"]
   },
   {
-    "question": "Where is the customer file read?",
-    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+    "question": "Where is numeric display logic implemented?",
+    "expected_path_contains": ["numeric-display.cob"]
   },
   {
-    "question": "Where is the annual fee applied?",
-    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+    "question": "Where is the COBOL tutorial program source?",
+    "expected_path_contains": ["tutorial.cob"]
   },
   {
-    "question": "Which section closes the customer file?",
-    "expected_paths": ["data/corpus/customer_accounts.cbl"]
+    "question": "Where are SQL-related copybook definitions?",
+    "expected_path_contains": ["sqlca.cpy", "sqlda.cpy"]
   }
 ]

@@ -1,6 +1,7 @@
 # Railway Runbook
 
 Canonical environment URLs live in `docs/environments.md`.
+Canonical corpus source lives in `docs/corpus-source.md`.
 
 ## Environment Strategy
 
@@ -39,11 +40,19 @@ LEGACYLENS_EMBEDDING_MODEL=text-embedding-3-small
 LEGACYLENS_GENERATION_MODEL=gpt-4.1-mini
 LEGACYLENS_QUERY_TOP_K=5
 LEGACYLENS_MAX_CONTEXT_CHARACTERS=9000
-LEGACYLENS_SOURCE_DIRECTORIES=["backend/data/corpus","data/corpus","corpus"]
+LEGACYLENS_SOURCE_DIRECTORIES=["data/corpus/sourceforge-trunk"]
 LEGACYLENS_SOURCE_EXTENSIONS=[".cbl",".cob",".cpy",".copy"]
 LEGACYLENS_CHUNK_MAX_LINES=80
 LEGACYLENS_CHUNK_OVERLAP_LINES=16
+LEGACYLENS_SOURCEFORGE_SYNC_TIMEOUT_SECONDS=120
 ```
+
+## Corpus Source Policy
+
+1. Ingest target is only SourceForge GnuCOBOL trunk:
+- `https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/`
+2. Keep `backend/data/corpus/sourceforge-trunk` synced before deploy:
+- `./scripts/fetch-sourceforge-trunk.sh`
 
 Frontend service:
 
@@ -56,10 +65,12 @@ VITE_SOURCE_REPO_BASE_URL=https://github.com/<org-or-user>/<repo>/blob/<branch>
 
 1. Open frontend URL and verify health panel returns `Status: ok`.
 2. Run ingestion once:
-- `POST https://<api-domain>/api/ingest?mode=incremental`
-3. Run query:
+- `POST https://<api-domain>/api/corpus/sourceforge/full-ingest`
+3. Check ingest benchmark run history:
+- `GET https://<api-domain>/api/ingest/runs?limit=5`
+4. Run query:
 - `POST https://<api-domain>/api/query` with `{"question":"Where is file IO handled?"}`
-4. Confirm response includes:
+5. Confirm response includes:
 - non-empty `answer`
 - `citations`
 - `snippets`
