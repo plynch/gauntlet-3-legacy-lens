@@ -207,6 +207,26 @@ export async function runIngest(mode: 'full' | 'incremental' = 'incremental'): P
   return response.json()
 }
 
+export async function getIngestRuns(limit = 5): Promise<IngestStats[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 200))
+  const response = await fetch(`${getApiBase()}/api/ingest/runs?limit=${safeLimit}`)
+
+  if (!response.ok) {
+    let detail = `Ingest history endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep default message if response body is not JSON.
+    }
+    throw new Error(detail)
+  }
+
+  return response.json()
+}
+
 export async function runSourceForgeFullIngest(): Promise<SourceForgeFullIngestResponse> {
   const response = await fetch(`${getApiBase()}/api/corpus/sourceforge/full-ingest`, { method: 'POST' })
 

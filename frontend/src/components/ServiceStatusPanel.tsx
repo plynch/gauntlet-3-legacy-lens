@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { HealthResponse, IngestStats, runIngest, syncSourceForge } from '../lib/api'
+import { HealthResponse, IngestStats, getIngestRuns, runIngest, syncSourceForge } from '../lib/api'
 
 type IngestMode = 'full' | 'incremental'
 type PipelinePhase = 'idle' | 'syncing' | 'indexing' | 'completed' | 'failed'
@@ -83,6 +83,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const [pipelinePhase, setPipelinePhase] = useState<PipelinePhase>('idle')
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [lastIndexedAt, setLastIndexedAt] = useState<string | null>(null)
 
   useEffect(() => {
     if (!operationStartedAt || (pipelinePhase !== 'syncing' && pipelinePhase !== 'indexing')) {
@@ -93,6 +94,25 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     }, 1000)
     return () => window.clearInterval(interval)
   }, [operationStartedAt, pipelinePhase])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadLastIngestRun() {
+      try {
+        const runs = await getIngestRuns(1)
+        if (cancelled || runs.length === 0) return
+        setLastIndexedAt(runs[0].completed_at)
+      } catch {
+        // keep label quiet if history endpoint is unavailable
+      }
+    }
+
+    loadLastIngestRun()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const skipWarning = useMemo(() => {
     if (!ingestStats || ingestStats.files_skipped === 0) return null
@@ -113,6 +133,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     try {
       const stats = await runIngest(mode)
       setIngestStats(stats)
+      setLastIndexedAt(stats.completed_at)
       setPipelinePhase('completed')
     } catch (err: unknown) {
       setPipelinePhase('failed')
@@ -143,6 +164,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
       setPipelinePhase('indexing')
       const stats = await runIngest('full')
       setIngestStats(stats)
+      setLastIndexedAt(stats.completed_at)
       setPipelinePhase('completed')
     } catch (err: unknown) {
       setPipelinePhase('failed')
@@ -182,9 +204,14 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
         <button onClick={() => onIngestClick('incremental')} disabled={isBusy}>
           {isIndexing && lastIngestMode === 'incremental' ? 'Indexing changes...' : 'Index changes'}
         </button>
-        <button className="secondary-button" onClick={() => onIngestClick('full')} disabled={isBusy}>
-          {isIndexing && lastIngestMode === 'full' ? 'Reindexing...' : 'Reindex all'}
-        </button>
+        <div className="action-stack">
+          <button className="secondary-button" onClick={() => onIngestClick('full')} disabled={isBusy}>
+            {isIndexing && lastIngestMode === 'full' ? 'Reindexing...' : 'Reindex all'}
+          </button>
+          <p className="last-indexed-note">
+            Last indexed at: {lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : 'not yet indexed'}
+          </p>
+        </div>
         <button className="secondary-button" onClick={onRefreshHealth} disabled={healthLoading || isBusy}>
           {healthLoading ? 'Refreshing...' : 'Refresh health'}
         </button>

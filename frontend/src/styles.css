@@ -87,6 +87,7 @@ button:disabled {
   display: grid;
   gap: 0.55rem;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
 }
 
 .primary-action {
@@ -146,6 +147,19 @@ button:disabled {
 
 .warning-panel p {
   margin: 0 0 0.6rem;
+}
+
+.action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.last-indexed-note {
+  margin: 0;
+  font-size: 0.73rem;
+  color: #64748b;
+  line-height: 1.25;
 }
 
 .muted-note {
