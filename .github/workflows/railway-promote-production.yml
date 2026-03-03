@@ -12,6 +12,10 @@ jobs:
   deploy-production:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
+      PRODUCTION_API_HEALTH_URL: ${{ secrets.PRODUCTION_API_HEALTH_URL }}
+      PRODUCTION_WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
     steps:
       - name: Checkout exact commit
         uses: actions/checkout@v4
@@ -26,24 +30,31 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy API to production
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-        run: railway up backend --path-as-root --ci --service api --environment production --project "$RAILWAY_PROJECT_ID"
+      - name: Validate required secrets
+        run: |
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "Missing RAILWAY_PRODUCTION_TOKEN secret"
+            exit 1
+          fi
+          if [ -z "${PRODUCTION_API_HEALTH_URL:-}" ]; then
+            echo "Missing PRODUCTION_API_HEALTH_URL secret"
+            exit 1
+          fi
+          if [ -z "${PRODUCTION_WEB_URL:-}" ]; then
+            echo "Missing PRODUCTION_WEB_URL secret"
+            exit 1
+          fi
 
-      - name: Deploy web to production
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-        run: railway up frontend --path-as-root --ci --service web --environment production --project "$RAILWAY_PROJECT_ID"
+      - name: Deploy API to production
+        working-directory: backend
+        run: railway up --ci --service api-prod --environment production
+
+      - name: Deploy frontend to production
+        working-directory: frontend
+        run: railway up --ci --service frontend-prod --environment production
 
       - name: Production smoke check API
-        env:
-          PRODUCTION_API_HEALTH_URL: ${{ secrets.PRODUCTION_API_HEALTH_URL }}
         run: curl --fail --show-error --silent "$PRODUCTION_API_HEALTH_URL"
 
-      - name: Production smoke check web
-        env:
-          PRODUCTION_WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
+      - name: Production smoke check frontend
         run: curl --fail --show-error --silent --head "$PRODUCTION_WEB_URL"

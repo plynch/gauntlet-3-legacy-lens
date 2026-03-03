@@ -10,6 +10,10 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
+      STAGING_API_HEALTH_URL: ${{ secrets.STAGING_API_HEALTH_URL }}
+      STAGING_WEB_URL: ${{ secrets.STAGING_WEB_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,24 +26,31 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy API to staging
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-        run: railway up backend --path-as-root --ci --service api --environment staging --project "$RAILWAY_PROJECT_ID"
+      - name: Validate required secrets
+        run: |
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "Missing RAILWAY_STAGING_TOKEN secret"
+            exit 1
+          fi
+          if [ -z "${STAGING_API_HEALTH_URL:-}" ]; then
+            echo "Missing STAGING_API_HEALTH_URL secret"
+            exit 1
+          fi
+          if [ -z "${STAGING_WEB_URL:-}" ]; then
+            echo "Missing STAGING_WEB_URL secret"
+            exit 1
+          fi
 
-      - name: Deploy web to staging
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-        run: railway up frontend --path-as-root --ci --service web --environment staging --project "$RAILWAY_PROJECT_ID"
+      - name: Deploy API to staging
+        working-directory: backend
+        run: railway up --ci --service api-staging --environment staging
+
+      - name: Deploy frontend to staging
+        working-directory: frontend
+        run: railway up --ci --service frontend-staging --environment staging
 
       - name: Staging smoke check API
-        env:
-          STAGING_API_HEALTH_URL: ${{ secrets.STAGING_API_HEALTH_URL }}
         run: curl --fail --show-error --silent "$STAGING_API_HEALTH_URL"
 
-      - name: Staging smoke check web
-        env:
-          STAGING_WEB_URL: ${{ secrets.STAGING_WEB_URL }}
+      - name: Staging smoke check frontend
         run: curl --fail --show-error --silent --head "$STAGING_WEB_URL"
