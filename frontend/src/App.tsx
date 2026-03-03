@@ -1,13 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react'
 import {
-  FeatureDefinition,
   HealthResponse,
   IngestStats,
   QueryResponse,
   buildSourceLink,
-  getFeatures,
   getHealth,
-  runFeatureQuery,
   runIngest,
   runQuery,
 } from './lib/api'
@@ -38,12 +35,6 @@ function App() {
   const [queryLoading, setQueryLoading] = useState(false)
   const [queryError, setQueryError] = useState<string>('')
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
-  const [features, setFeatures] = useState<FeatureDefinition[]>([])
-  const [featuresLoading, setFeaturesLoading] = useState(false)
-  const [featureError, setFeatureError] = useState('')
-  const [selectedFeature, setSelectedFeature] = useState('')
-  const [featureSubject, setFeatureSubject] = useState('')
-  const [featureQueryLoading, setFeatureQueryLoading] = useState(false)
   const [ingestLoadingMode, setIngestLoadingMode] = useState<IngestMode | null>(null)
   const [ingestError, setIngestError] = useState<string>('')
   const [ingestStats, setIngestStats] = useState<IngestStats | null>(null)
@@ -63,24 +54,8 @@ function App() {
     }
   }
 
-  async function loadFeatures() {
-    setFeaturesLoading(true)
-    setFeatureError('')
-
-    try {
-      const definitions = await getFeatures()
-      setFeatures(definitions)
-      setSelectedFeature((current) => current || (definitions[0]?.key ?? ''))
-    } catch (err: unknown) {
-      setFeatureError(err instanceof Error ? err.message : 'Feature catalog failed to load')
-    } finally {
-      setFeaturesLoading(false)
-    }
-  }
-
   useEffect(() => {
     loadHealth()
-    loadFeatures()
   }, [])
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -119,29 +94,6 @@ function App() {
       setIngestError(err instanceof Error ? err.message : 'Ingestion failed')
     } finally {
       setIngestLoadingMode(null)
-    }
-  }
-
-  async function onFeatureSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!selectedFeature) {
-      setFeatureError('Please choose a feature.')
-      return
-    }
-
-    setFeatureQueryLoading(true)
-    setFeatureError('')
-    setQueryError('')
-    setQueryResult(null)
-
-    try {
-      const result = await runFeatureQuery(selectedFeature, featureSubject.trim() || undefined)
-      setQueryResult(result)
-      setQuery(result.question)
-    } catch (err: unknown) {
-      setFeatureError(err instanceof Error ? err.message : 'Feature query failed')
-    } finally {
-      setFeatureQueryLoading(false)
     }
   }
 
@@ -189,41 +141,6 @@ function App() {
           {ingestError ? <p role="alert">Indexing issue: {ingestError}</p> : null}
           {ingestStats ? <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p> : null}
         </div>
-      </section>
-
-      <section>
-        <h2>Code Understanding Features</h2>
-        {featuresLoading ? <p>Loading feature catalog…</p> : null}
-        {featureError ? <p role="alert">Feature issue: {featureError}</p> : null}
-        {features.length > 0 ? (
-          <form onSubmit={onFeatureSubmit}>
-            <label htmlFor="feature-select">Feature</label>
-            <select
-              id="feature-select"
-              value={selectedFeature}
-              onChange={(event) => setSelectedFeature(event.target.value)}
-            >
-              {features.map((feature) => (
-                <option key={feature.key} value={feature.key}>
-                  {feature.title}
-                </option>
-              ))}
-            </select>
-            <p className="muted-note">
-              {features.find((feature) => feature.key === selectedFeature)?.description}
-            </p>
-            <label htmlFor="feature-subject">Target section/paragraph (optional)</label>
-            <input
-              id="feature-subject"
-              value={featureSubject}
-              onChange={(event) => setFeatureSubject(event.target.value)}
-              placeholder={features.find((feature) => feature.key === selectedFeature)?.example_subject || 'MAIN-LOGIC'}
-            />
-            <button type="submit" disabled={featureQueryLoading}>
-              {featureQueryLoading ? 'Running feature...' : 'Run feature'}
-            </button>
-          </form>
-        ) : null}
       </section>
 
       <section>

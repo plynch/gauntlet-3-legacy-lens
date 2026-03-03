@@ -11,7 +11,6 @@ RAG application for understanding legacy COBOL code with grounded evidence.
 - React frontend with:
   - Health status panel
   - "Index changes" + "Reindex all" actions
-  - Built-in code understanding feature runner (explanation, dependency mapping, pattern detection, business logic, error handling)
   - Query form with answer + citations + evidence snippets
 - Qdrant vector storage integration
 - Railway-ready deployment for staging and production
@@ -101,3 +100,5 @@ curl -X POST 'http://localhost:8000/api/features/code_explanation/query' \
   -H 'Content-Type: application/json' \
   -d '{"subject":"READ-CUSTOMER"}'
 ```
+
+Feature query endpoints are available for advanced workflows, but intentionally not shown in the default UI.

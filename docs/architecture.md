@@ -7,7 +7,6 @@ LegacyLens is a staging-first RAG application for legacy COBOL code understandin
 1. Frontend (`React + TypeScript`) provides:
 - health check
 - ingest controls (`Index changes`, `Reindex all`)
-- feature-driven analysis flows
 - free-form query UI with citations and snippets
 2. Backend (`FastAPI`) provides:
 - `GET /api/health`
@@ -32,14 +31,14 @@ LegacyLens is a staging-first RAG application for legacy COBOL code understandin
 
 ## Query
 
-1. User asks free-form question or runs a feature query.
-2. Backend builds effective question text (feature mode uses templates).
+1. User asks a free-form question.
+2. Backend embeds the question and performs retrieval.
 3. Embed question with the same embedding model.
 4. Retrieve top-k nearest chunks from Qdrant.
 5. Generate grounded answer from retrieved context.
 6. Return answer with citations and snippets.
 
-## Feature Workflows
+## Optional Feature APIs
 
 Current explicit code-understanding features:
 
@@ -50,6 +49,7 @@ Current explicit code-understanding features:
 5. `error_handling_review`
 
 Each feature is a stable query template over the same retrieval/synthesis pipeline.
+These APIs are available for advanced workflows and evaluation, but not exposed in the default staging UI.
 
 ## Deployment Topology
 
