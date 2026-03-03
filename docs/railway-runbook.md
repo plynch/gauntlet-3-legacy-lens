@@ -1,114 +1,76 @@
-# Railway Deployment and Promotion Runbook
+# Railway Runbook
 
-This runbook assumes one Railway project with two environments:
+## Environment Strategy
 
-1. `staging`
-2. `production`
+1. One Railway project with two environments:
+- `staging` tracks `main`
+- `production` tracks `production`
+2. Same service topology in both:
+- `qdrant` (private + persistent volume)
+- `api`
+- `frontend`
 
-Both environments run the same three services:
+## First-Time Setup per Environment
 
-1. `qdrant`
-2. `api`
-3. `web`
+1. Create services:
+- `qdrant` from image `qdrant/qdrant:latest`
+- `api` from repo root directory `/backend`
+- `frontend` from repo root directory `/frontend`
+2. Add qdrant volume mounted at `/qdrant/storage`.
+3. Generate public domains for `api` and `frontend`.
+4. Keep qdrant private (no public domain).
 
-## 1. Prerequisites
+## Variables
 
-1. Push this repo to GitHub first.
-2. Railway project already exists with `staging` and `production` environments.
-3. You have Railway service domains enabled for `api` and `web` in each environment.
+API service:
 
-## 1.1 Environment file templates in this repo
+```env
+LEGACYLENS_APP_NAME=LegacyLens API (<Environment>)
+LEGACYLENS_ENVIRONMENT=<staging|production>
+LEGACYLENS_API_PREFIX=/api
+LEGACYLENS_API_VERSION=0.1.0
+LEGACYLENS_ALLOWED_ORIGINS=["https://<frontend-domain>"]
+LEGACYLENS_QDRANT_URL=http://qdrant.railway.internal:6333
+LEGACYLENS_QDRANT_COLLECTION=legacylens_chunks
+LEGACYLENS_OPENAI_API_KEY=<secret>
+LEGACYLENS_EMBEDDING_MODEL=text-embedding-3-small
+LEGACYLENS_GENERATION_MODEL=gpt-4.1-mini
+LEGACYLENS_QUERY_TOP_K=5
+LEGACYLENS_MAX_CONTEXT_CHARACTERS=9000
+LEGACYLENS_SOURCE_DIRECTORIES=["backend/data/corpus","data/corpus","corpus"]
+LEGACYLENS_SOURCE_EXTENSIONS=[".cbl",".cob",".cpy",".copy"]
+LEGACYLENS_CHUNK_MAX_LINES=80
+LEGACYLENS_CHUNK_OVERLAP_LINES=16
+```
 
-1. Backend staging: `backend/.env.staging.example`
-2. Backend production: `backend/.env.production.example`
-3. Frontend staging: `frontend/.env.staging.example`
-4. Frontend production: `frontend/.env.production.example`
-5. To generate local `.env` files from those templates, run:
-6. `./scripts/sync-env-files.sh`
-7. Generated `.env` files are gitignored and safe to edit locally.
+Frontend service:
 
-## 2. First-time setup in Railway (staging)
+```env
+VITE_API_BASE_URL=https://<api-domain>
+```
 
-1. In Railway, select the `staging` environment.
-2. Create service `qdrant` from Docker image `qdrant/qdrant:latest`.
-3. Add a volume to `qdrant` mounted at `/qdrant/storage` (at least 1 GB).
-4. Create service `api` from GitHub repo.
-5. Set `api` root directory to `backend`.
-6. Create service `web` from GitHub repo.
-7. Set `web` root directory to `frontend`.
-8. Generate public domains for `api` and `web`.
-9. Keep `qdrant` private.
+## Smoke Test Checklist
 
-Set environment variables in `staging`:
+1. Open frontend URL and verify health panel returns `Status: ok`.
+2. Run ingestion once:
+- `POST https://<api-domain>/api/ingest?mode=incremental`
+3. Run query:
+- `POST https://<api-domain>/api/query` with `{"question":"Where is file IO handled?"}`
+4. Confirm response includes:
+- non-empty `answer`
+- `citations`
+- `snippets`
 
-1. `api`
-2. `LEGACYLENS_QDRANT_URL=http://qdrant.railway.internal:6333`
-3. `LEGACYLENS_ALLOWED_ORIGINS=["https://<staging-web-domain>"]`
-4. `LEGACYLENS_OPENAI_API_KEY=<your key>`
-5. `web`
-6. `VITE_API_BASE_URL=https://<staging-api-domain>`
+## Promotion Procedure
 
-Deploy staging and verify:
+1. Merge feature branch into `main`.
+2. Confirm staging smoke checks pass.
+3. Merge `main` into `production`.
+4. Wait for production deploy and repeat smoke checks.
+5. If production fails, redeploy previous known-good deployment from Railway history.
 
-1. `https://<staging-api-domain>/api/health`
-2. `https://<staging-web-domain>`
+## Automation
 
-## 3. Mirror setup in Railway (production)
-
-1. Switch environment to `production`.
-2. Create the same service names: `qdrant`, `api`, `web`.
-3. Configure roots the same way (`backend` for `api`, `frontend` for `web`).
-4. Add qdrant volume at `/qdrant/storage`.
-5. Generate production domains for `api` and `web`.
-6. Set production environment variables:
-7. `api`
-8. `LEGACYLENS_QDRANT_URL=http://qdrant.railway.internal:6333`
-9. `LEGACYLENS_ALLOWED_ORIGINS=["https://<production-web-domain>"]`
-10. `LEGACYLENS_OPENAI_API_KEY=<your key>`
-11. `web`
-12. `VITE_API_BASE_URL=https://<production-api-domain>`
-
-## 4. GitHub automation setup
-
-This repo includes two workflows:
-
-1. `.github/workflows/railway-deploy-staging.yml`
-2. `.github/workflows/railway-promote-production.yml`
-
-Add these GitHub repository secrets:
-
-1. `RAILWAY_PROJECT_ID` (same Railway project id)
-2. `RAILWAY_STAGING_TOKEN` (project token scoped to staging)
-3. `RAILWAY_PRODUCTION_TOKEN` (project token scoped to production)
-4. `STAGING_API_HEALTH_URL` (full url, usually `https://.../api/health`)
-5. `STAGING_WEB_URL` (full web url)
-6. `PRODUCTION_API_HEALTH_URL` (full url, usually `https://.../api/health`)
-7. `PRODUCTION_WEB_URL` (full web url)
-
-Recommended branch strategy:
-
-1. `main` deploys to staging automatically via `railway-deploy-staging.yml`.
-2. Production deploy is manual via `railway-promote-production.yml`.
-
-## 5. Promote staging to production
-
-1. Pick a commit SHA that is already healthy in staging.
-2. In GitHub, open Actions.
-3. Run `Promote Staging Commit to Production (Railway)`.
-4. Paste the exact `commit_sha`.
-5. Wait for production smoke checks to pass.
-
-## 6. Rollback
-
-1. In Railway production environment, open `api` or `web` service.
-2. Open Deployments.
-3. Redeploy the previous successful deployment.
-4. Re-check:
-5. `https://<production-api-domain>/api/health`
-6. `https://<production-web-domain>`
-
-## 7. Notes and constraints
-
-1. Staging and production qdrant data are separate.
-2. Promotion deploys app code, not qdrant dataset state.
-3. If production data is missing, run ingest in production after deploy.
+1. CI workflow: `.github/workflows/ci.yml`
+2. Staging deploy workflow: `.github/workflows/railway-deploy-staging.yml`
+3. Production promotion workflow: `.github/workflows/railway-promote-production.yml`
