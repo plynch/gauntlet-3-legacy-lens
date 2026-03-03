@@ -27,7 +27,9 @@ body {
 }
 
 section {
-  margin-top: 1.25rem;
+  margin-top: 1.35rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
 }
 
 button,
@@ -42,16 +44,38 @@ textarea {
 }
 
 button {
-  margin-top: 0.75rem;
   border: 0;
   border-radius: 8px;
   background: #0f172a;
   color: #fff;
   padding: 0.55rem 0.9rem;
+  cursor: pointer;
 }
 
 button:disabled {
+  cursor: not-allowed;
   opacity: 0.6;
+}
+
+.secondary-button {
+  background: #334155;
+}
+
+.button-row {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.muted-note {
+  margin: 0.55rem 0 0;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.health-list {
+  margin-top: 0;
 }
 
 article {
@@ -71,4 +95,24 @@ pre {
   border-radius: 6px;
   font-size: 0.85rem;
   line-height: 1.4;
+}
+
+.answer-text {
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+}
+
+a {
+  color: #0f172a;
+  text-decoration-thickness: 2px;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 0.9rem;
+  }
+
+  .shell {
+    padding: 1rem;
+  }
 }

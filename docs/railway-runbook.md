@@ -47,6 +47,7 @@ Frontend service:
 
 ```env
 VITE_API_BASE_URL=https://<api-domain>
+VITE_SOURCE_REPO_BASE_URL=https://github.com/<org-or-user>/<repo>/blob/<branch>
 ```
 
 ## Smoke Test Checklist

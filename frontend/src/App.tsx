@@ -1,5 +1,31 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { HealthResponse, IngestStats, QueryResponse, getHealth, runIngest, runQuery } from './lib/api'
+import {
+  HealthResponse,
+  IngestStats,
+  QueryResponse,
+  buildSourceLink,
+  getHealth,
+  runIngest,
+  runQuery,
+} from './lib/api'
+
+type IngestMode = 'full' | 'incremental'
+
+function formatIngestSummary(stats: IngestStats, mode: IngestMode | null): string {
+  if (stats.files_seen === 0) {
+    return 'No source files were discovered in configured source directories.'
+  }
+
+  if (stats.files_indexed === 0 && stats.files_skipped === stats.files_seen) {
+    if (mode === 'incremental') {
+      return `No changed files detected. ${stats.files_skipped}/${stats.files_seen} files were skipped as unchanged.`
+    }
+
+    return `No chunks were indexed. ${stats.files_skipped}/${stats.files_seen} files were skipped (likely empty or unchunkable).`
+  }
+
+  return `Indexed ${stats.files_indexed}/${stats.files_seen} files and ${stats.chunks_indexed} chunks (${stats.files_skipped} skipped).`
+}
 
 function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null)
@@ -9,9 +35,10 @@ function App() {
   const [queryLoading, setQueryLoading] = useState(false)
   const [queryError, setQueryError] = useState<string>('')
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
-  const [ingestLoading, setIngestLoading] = useState(false)
+  const [ingestLoadingMode, setIngestLoadingMode] = useState<IngestMode | null>(null)
   const [ingestError, setIngestError] = useState<string>('')
   const [ingestStats, setIngestStats] = useState<IngestStats | null>(null)
+  const [lastIngestMode, setLastIngestMode] = useState<IngestMode | null>(null)
 
   async function loadHealth() {
     setHealthLoading(true)
@@ -54,16 +81,19 @@ function App() {
     }
   }
 
-  async function onIngestClick() {
-    setIngestLoading(true)
+  async function onIngestClick(mode: IngestMode) {
+    setIngestLoadingMode(mode)
+    setLastIngestMode(mode)
     setIngestError('')
+    setIngestStats(null)
+
     try {
-      const stats = await runIngest('incremental')
+      const stats = await runIngest(mode)
       setIngestStats(stats)
     } catch (err: unknown) {
       setIngestError(err instanceof Error ? err.message : 'Ingestion failed')
     } finally {
-      setIngestLoading(false)
+      setIngestLoadingMode(null)
     }
   }
 
@@ -79,25 +109,37 @@ function App() {
         ) : healthError ? (
           <p role="alert">Backend issue: {healthError}</p>
         ) : health ? (
-          <ul>
+          <ul className="health-list">
             <li>Status: {health.status}</li>
             <li>Service: {health.service}</li>
             <li>Qdrant configured: {health.qdrant_configured ? 'yes' : 'no'}</li>
             <li>Timestamp: {new Date(health.timestamp).toLocaleString()}</li>
           </ul>
         ) : null}
-        <button onClick={loadHealth}>Refresh health</button>
-        <div>
-          <button onClick={onIngestClick} disabled={ingestLoading}>
-            {ingestLoading ? 'Indexing...' : 'Index corpus'}
+        <div className="button-row">
+          <button onClick={loadHealth} disabled={healthLoading}>
+            {healthLoading ? 'Refreshing...' : 'Refresh health'}
           </button>
+        </div>
+        <div className="button-row">
+          <button onClick={() => onIngestClick('incremental')} disabled={ingestLoadingMode !== null}>
+            {ingestLoadingMode === 'incremental' ? 'Indexing changes...' : 'Index changes'}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => onIngestClick('full')}
+            disabled={ingestLoadingMode !== null}
+          >
+            {ingestLoadingMode === 'full' ? 'Reindexing...' : 'Reindex all'}
+          </button>
+        </div>
+        <p className="muted-note">
+          Use <strong>Index changes</strong> for normal use. Use <strong>Reindex all</strong> after chunking/model
+          changes.
+        </p>
+        <div>
           {ingestError ? <p role="alert">Indexing issue: {ingestError}</p> : null}
-          {ingestStats ? (
-            <p>
-              Indexed {ingestStats.files_indexed}/{ingestStats.files_seen} files, {ingestStats.chunks_indexed}{' '}
-              chunks ({ingestStats.files_skipped} skipped).
-            </p>
-          ) : null}
+          {ingestStats ? <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p> : null}
         </div>
       </section>
 
@@ -122,19 +164,30 @@ function App() {
       {queryResult ? (
         <section>
           <h2>Answer</h2>
-          <p>{queryResult.answer}</p>
+          <pre className="answer-text">{queryResult.answer}</pre>
           {queryResult.insufficient_evidence ? <p>Evidence confidence: low</p> : null}
 
           {queryResult.citations.length > 0 ? (
             <>
               <h3>Citations</h3>
               <ul>
-                {queryResult.citations.map((citation) => (
-                  <li key={`${citation.path}-${citation.line_start}-${citation.line_end}`}>
-                    {citation.path}:{citation.line_start}-{citation.line_end}
-                    {citation.section ? ` (${citation.section})` : ''}
-                  </li>
-                ))}
+                {queryResult.citations.map((citation, index) => {
+                  const sourceLink = buildSourceLink(citation.path, citation.line_start, citation.line_end)
+                  return (
+                    <li key={`${citation.path}-${citation.line_start}-${citation.line_end}`}>
+                      [{index + 1}] {citation.path}:{citation.line_start}-{citation.line_end}
+                      {citation.section ? ` (${citation.section})` : ''}
+                      {sourceLink ? (
+                        <>
+                          {' '}
+                          <a href={sourceLink} target="_blank" rel="noreferrer">
+                            open source
+                          </a>
+                        </>
+                      ) : null}
+                    </li>
+                  )
+                })}
               </ul>
             </>
           ) : null}
@@ -142,17 +195,34 @@ function App() {
           {queryResult.snippets.length > 0 ? (
             <>
               <h3>Evidence Snippets</h3>
-              {queryResult.snippets.map((snippet) => (
-                <article key={`${snippet.citation.path}-${snippet.citation.line_start}-${snippet.citation.line_end}`}>
-                  <p>
-                    <strong>
-                      {snippet.citation.path}:{snippet.citation.line_start}-{snippet.citation.line_end}
-                    </strong>{' '}
-                    score {snippet.score.toFixed(3)}
-                  </p>
-                  <pre>{snippet.text}</pre>
-                </article>
-              ))}
+              {queryResult.snippets.map((snippet) => {
+                const sourceLink = buildSourceLink(
+                  snippet.citation.path,
+                  snippet.citation.line_start,
+                  snippet.citation.line_end,
+                )
+                return (
+                  <article
+                    key={`${snippet.citation.path}-${snippet.citation.line_start}-${snippet.citation.line_end}`}
+                  >
+                    <p>
+                      <strong>
+                        {snippet.citation.path}:{snippet.citation.line_start}-{snippet.citation.line_end}
+                      </strong>{' '}
+                      score {snippet.score.toFixed(3)}
+                      {sourceLink ? (
+                        <>
+                          {' '}
+                          <a href={sourceLink} target="_blank" rel="noreferrer">
+                            open source
+                          </a>
+                        </>
+                      ) : null}
+                    </p>
+                    <pre>{snippet.text}</pre>
+                  </article>
+                )
+              })}
             </>
           ) : null}
         </section>

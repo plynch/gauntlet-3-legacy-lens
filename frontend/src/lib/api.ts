@@ -42,6 +42,7 @@ const fallbackApiBase = 'http://localhost:8000'
 
 type RuntimeConfig = {
   API_BASE_URL?: string
+  SOURCE_REPO_BASE_URL?: string
 }
 
 function getRuntimeConfig(): RuntimeConfig | undefined {
@@ -61,10 +62,43 @@ function normalizeApiBase(rawValue: string | undefined): string {
   return withoutQuotes.replace(/\/+$/, '')
 }
 
+function normalizeOptionalBase(rawValue: string | undefined): string {
+  const value = (rawValue || '').trim()
+  if (!value) return ''
+
+  const withoutQuotes =
+    (value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))
+      ? value.slice(1, -1)
+      : value
+
+  return withoutQuotes.replace(/\/+$/, '')
+}
+
 function getApiBase(): string {
   return normalizeApiBase(
     getRuntimeConfig()?.API_BASE_URL || (import.meta.env.VITE_API_BASE_URL as string | undefined),
   )
+}
+
+function getSourceRepoBase(): string {
+  return normalizeOptionalBase(
+    getRuntimeConfig()?.SOURCE_REPO_BASE_URL ||
+      (import.meta.env.VITE_SOURCE_REPO_BASE_URL as string | undefined),
+  )
+}
+
+export function buildSourceLink(path: string, lineStart: number, lineEnd: number): string | null {
+  const base = getSourceRepoBase()
+  if (!base) {
+    return null
+  }
+
+  const normalizedPath = path
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")
+
+  return `${base}/${normalizedPath}#L${lineStart}-L${lineEnd}`
 }
 
 export async function getHealth(): Promise<HealthResponse> {
