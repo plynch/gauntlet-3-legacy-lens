@@ -1,17 +1,13 @@
-import re
+import subprocess
 import shutil
-import tarfile
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib import parse as urllib_parse
-from urllib import request as urllib_request
 
 from app.models.corpus import SourceForgeSyncStats
 
 SOURCEFORGE_TREE_URL = "https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/"
-SOURCEFORGE_TARBALL_URL = "https://sourceforge.net/p/gnucobol/code/HEAD/tarball"
-TOKEN_PATTERN = r'name="_csrf_token" type="hidden" value="([^"]+)"'
+SOURCEFORGE_SVN_TRUNK_URL = "https://svn.code.sf.net/p/gnucobol/code/trunk"
 CORPUS_SUFFIXES = (".cbl", ".cob", ".cpy", ".copy")
 
 
@@ -19,28 +15,10 @@ def sync_sourceforge_trunk(destination_path: str, timeout_seconds: int = 120) ->
     destination = Path(destination_path)
     destination.mkdir(parents=True, exist_ok=True)
 
-    opener = urllib_request.build_opener(urllib_request.HTTPCookieProcessor())
-    tree_html = http_read_text(opener, SOURCEFORGE_TREE_URL, timeout_seconds)
-    token = extract_csrf_token(tree_html)
-
-    payload = urllib_parse.urlencode({"path": "/trunk", "_csrf_token": token}).encode("utf-8")
-    snapshot_bytes = http_post_bytes(opener, SOURCEFORGE_TARBALL_URL, payload, timeout_seconds)
-
     with tempfile.TemporaryDirectory(prefix="legacylens-sourceforge-") as temp_dir:
         temp_root = Path(temp_dir)
-        archive_path = temp_root / "sourceforge-trunk.tar.gz"
-        extract_path = temp_root / "extract"
-        archive_path.write_bytes(snapshot_bytes)
-        extract_path.mkdir(parents=True, exist_ok=True)
-
-        with tarfile.open(archive_path, mode="r:gz") as tar:
-            tar.extractall(path=extract_path)
-
-        root_entries = [entry for entry in extract_path.iterdir() if entry.is_dir()]
-        if not root_entries:
-            raise RuntimeError("SourceForge snapshot extraction produced no directory content.")
-
-        extracted_root = root_entries[0]
+        extracted_root = temp_root / "trunk"
+        run_svn_export(extracted_root, timeout_seconds=timeout_seconds)
         clear_directory(destination)
         copy_tree(extracted_root, destination)
 
@@ -55,24 +33,29 @@ def sync_sourceforge_trunk(destination_path: str, timeout_seconds: int = 120) ->
     )
 
 
-def http_read_text(opener: urllib_request.OpenerDirector, url: str, timeout_seconds: int) -> str:
-    with opener.open(url, timeout=timeout_seconds) as response:
-        return response.read().decode("utf-8", errors="replace")
-
-
-def http_post_bytes(
-    opener: urllib_request.OpenerDirector, url: str, payload: bytes, timeout_seconds: int
-) -> bytes:
-    request = urllib_request.Request(url=url, data=payload, method="POST")
-    with opener.open(request, timeout=timeout_seconds) as response:
-        return response.read()
-
-
-def extract_csrf_token(html: str) -> str:
-    match = re.search(TOKEN_PATTERN, html)
-    if not match:
-        raise RuntimeError("Failed to parse SourceForge CSRF token.")
-    return match.group(1)
+def run_svn_export(destination: Path, timeout_seconds: int) -> None:
+    command = [
+        "svn",
+        "export",
+        "--force",
+        SOURCEFORGE_SVN_TRUNK_URL,
+        str(destination),
+    ]
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            timeout=timeout_seconds,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("SourceForge sync requires `svn` in the API runtime.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"SourceForge sync timed out after {timeout_seconds}s.") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or "").strip()
+        raise RuntimeError(f"SourceForge sync failed: {detail or 'svn export error'}") from exc
 
 
 def clear_directory(path: Path) -> None:

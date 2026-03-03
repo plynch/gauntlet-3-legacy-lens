@@ -2,76 +2,44 @@
 set -euo pipefail
 
 SOURCEFORGE_TREE_URL="https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/"
-SOURCEFORGE_TARBALL_URL="https://sourceforge.net/p/gnucobol/code/HEAD/tarball"
+SOURCEFORGE_SVN_URL="https://svn.code.sf.net/p/gnucobol/code/trunk"
 DEFAULT_DEST_DIR="backend/data/corpus/sourceforge-trunk"
-WORK_DIR="/tmp/legacylens-sourceforge"
 
 DEST_DIR="${1:-$DEFAULT_DEST_DIR}"
+WORK_DIR="$(mktemp -d /tmp/legacylens-sourceforge.XXXXXX)"
+trap 'rm -rf "$WORK_DIR"' EXIT
 
-mkdir -p "$WORK_DIR"
-cookie_file="$WORK_DIR/sourceforge.cookies"
-page_file="$WORK_DIR/sourceforge-tree.html"
-archive_file="$WORK_DIR/sourceforge-trunk.tar.gz"
-extract_dir="$WORK_DIR/sourceforge-trunk-extract"
-
-echo "Fetching SourceForge trunk page..."
-curl --retry 5 --retry-all-errors -sS -c "$cookie_file" "$SOURCEFORGE_TREE_URL" -o "$page_file"
-
-csrf_token="$(
-  grep -Eo 'name="_csrf_token" type="hidden" value="[^"]+"' "$page_file" \
-    | sed -E 's/.*value="([^"]+)"/\1/' \
-    | head -n 1
-)"
-
-if [[ -z "$csrf_token" ]]; then
-  echo "Failed to parse SourceForge CSRF token from tree page."
-  echo "Open $SOURCEFORGE_TREE_URL and download snapshot manually."
+if ! command -v svn >/dev/null 2>&1; then
+  echo "Missing dependency: svn"
+  echo "Install Subversion and rerun. macOS example: brew install subversion"
   exit 1
 fi
 
-echo "Downloading SourceForge trunk snapshot..."
-curl --retry 5 --retry-all-errors -sS -L \
-  -b "$cookie_file" \
-  -c "$cookie_file" \
-  -X POST \
-  -d "path=/trunk" \
-  -d "_csrf_token=$csrf_token" \
-  "$SOURCEFORGE_TARBALL_URL" \
-  -o "$archive_file"
-
-mkdir -p "$extract_dir"
-rm -rf "$extract_dir"/*
-tar -xzf "$archive_file" -C "$extract_dir"
-
-top_dir="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-if [[ -z "$top_dir" ]]; then
-  echo "Failed to extract snapshot archive."
-  exit 1
-fi
+echo "Source of truth: $SOURCEFORGE_TREE_URL"
+echo "Running svn export..."
+svn export --force "$SOURCEFORGE_SVN_URL" "$WORK_DIR/trunk"
 
 mkdir -p "$DEST_DIR"
 rm -rf "$DEST_DIR"/*
-cp -R "$top_dir"/. "$DEST_DIR"/
+cp -R "$WORK_DIR/trunk"/. "$DEST_DIR"/
 
-file_count="$(
-  find "$DEST_DIR" -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) | wc -l | tr -d ' '
-)"
-loc_total="$(
-  find "$DEST_DIR" -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) \
-    -print0 \
-    | xargs -0 wc -l \
-    | tail -n 1 \
-    | awk '{print $1}'
-)"
-bytes_total="$(
-  find "$DEST_DIR" -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) \
-    -print0 \
-    | xargs -0 wc -c \
-    | tail -n 1 \
-    | awk '{print $1}'
-)"
+file_count="$(find "$DEST_DIR" -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) | wc -l | tr -d ' ')"
 
-echo "SourceForge trunk synced to $DEST_DIR"
+if [[ "$file_count" -eq 0 ]]; then
+  loc_total=0
+  bytes_total=0
+else
+  loc_total="$(
+    find "$DEST_DIR" -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) \
+      -print0 | xargs -0 wc -l | tail -n 1 | awk '{print $1}'
+  )"
+  bytes_total="$(
+    find "$DEST_DIR" -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) \
+      -print0 | xargs -0 wc -c | tail -n 1 | awk '{print $1}'
+  )"
+fi
+
+echo "Synced into $DEST_DIR"
 echo "COBOL files: $file_count"
 echo "Total LOC: ${loc_total:-0}"
 echo "Total bytes: ${bytes_total:-0}"

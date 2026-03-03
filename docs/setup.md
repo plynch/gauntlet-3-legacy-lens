@@ -21,19 +21,23 @@ docker compose up --build
 ./scripts/fetch-sourceforge-trunk.sh
 ```
 
-4. Sync SourceForge trunk + full ingest:
+4. Preferred: test ingest from browser first.
+
+Open `http://localhost:4173` and click `Sync SourceForge + Reindex`.
+
+5. Sync SourceForge trunk + full ingest via API (optional):
 
 ```bash
 curl -X POST 'http://localhost:8000/api/corpus/sourceforge/full-ingest'
 ```
 
-5. (Optional) direct ingest only:
+6. (Optional) direct ingest only:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/ingest?mode=full'
 ```
 
-6. Query:
+7. Query:
 
 ```bash
 curl -X POST 'http://localhost:8000/api/query' \

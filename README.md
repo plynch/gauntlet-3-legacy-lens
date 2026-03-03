@@ -1,84 +1,108 @@
 # LegacyLens
 
-RAG application for understanding legacy COBOL code with grounded evidence.
+LegacyLens is a browser-based RAG app for understanding large legacy COBOL codebases with grounded evidence.
 
-## Implemented so far
+## What This Is
 
-- FastAPI backend with:
-  - `GET /api/health`
-  - `POST /api/corpus/sourceforge/full-ingest`
-  - `POST /api/ingest` (`mode=full|incremental`)
-  - `GET /api/ingest/runs`
-  - `POST /api/query`
-- React frontend with:
-  - Health status panel
-  - "Index changes" + "Reindex all" actions
-  - Query form with answer + citations + evidence snippets
-- Qdrant vector storage integration
-- Railway-ready deployment for staging and production
+1. A public web app where you ask questions about GnuCOBOL source code.
+2. Answers are backed by retrieved code snippets and file/line citations.
+3. Built for deadline-driven codebase onboarding and technical review demos.
 
-## Key docs
+## Who It Is For
 
-1. Architecture: `docs/architecture.md`
-2. Cost analysis: `docs/cost-analysis.md`
-3. Environment URLs and vars: `docs/environments.md`
-4. Railway runbook: `docs/railway-runbook.md`
-5. Evaluation process: `docs/evaluation.md`
-6. Ingest benchmarks: `docs/ingest-benchmarks.md`
-7. Corpus source of truth: `docs/corpus-source.md`
+1. Engineers onboarding to unfamiliar COBOL systems.
+2. Reviewers evaluating retrieval quality and citation grounding.
+3. Teams that need quick code understanding without IDE-heavy setup.
 
-## Run locally
+## When To Use It
+
+Use LegacyLens when you need fast answers to questions like:
+
+1. Where is file I/O performed?
+2. Which sections modify a given record?
+3. What does a paragraph/section do?
+4. What evidence supports this answer?
+
+Do not use it as a source-of-truth for code changes; it is a read/analyze tool.
+
+## Source Of Truth Corpus
+
+LegacyLens ingests only the latest GnuCOBOL SourceForge trunk:
+
+- [GnuCOBOL SourceForge trunk](https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/)
+
+Configured ingest directory:
+
+- `data/corpus/sourceforge-trunk`
+
+## How It Works
+
+1. Sync SourceForge trunk into local/runtime corpus directory.
+2. Chunk COBOL files by paragraph/section boundaries with overlap fallback.
+3. Embed chunks and store vectors + metadata in Qdrant.
+4. On query, embed question, retrieve top-k chunks, generate grounded answer.
+5. Return answer + citations + evidence snippets.
+
+## Browser-First Staging Workflow (Recommended)
+
+Use this first before CLI or curl checks.
+
+1. Open staging frontend:
+- `https://legacy-lens-staging.up.railway.app/`
+2. Verify health panel shows `Status: ok`.
+3. Click `Sync SourceForge + Reindex`.
+4. Wait for ingest completion and verify UI shows:
+- mode
+- start time
+- end time
+- duration
+- corpus LOC
+- corpus size
+5. Run at least 3 queries and verify:
+- non-empty answer
+- citations visible
+- evidence snippets visible
+
+Only after browser flow passes, run API checks if needed.
+
+## API Endpoints
+
+1. `GET /api/health`
+2. `POST /api/corpus/sourceforge/sync`
+3. `POST /api/corpus/sourceforge/full-ingest`
+4. `POST /api/ingest?mode=full|incremental`
+5. `GET /api/ingest/runs?limit=<n>`
+6. `POST /api/query`
+7. `GET /api/features`
+8. `POST /api/features/{feature_key}/query`
+
+## Local Run
 
 ```bash
 docker compose up --build
 ```
 
-Then open:
+Open:
 
-- Frontend: `http://localhost:4173`
-- API health: `http://localhost:8000/api/health`
+1. Frontend: `http://localhost:4173`
+2. API health: `http://localhost:8000/api/health`
 
-Sync latest GnuCOBOL trunk corpus before ingest:
+Optional local corpus sync:
 
 ```bash
 ./scripts/fetch-sourceforge-trunk.sh
 ```
 
-## Testing and quality checks
+## Testing and Quality Checks
 
-Backend fast local loop (recommended for daily development):
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-pytest -q tests
-ruff check app tests
-```
-
-Backend Docker fallback (if you do not want local Python tooling):
+Backend:
 
 ```bash
 docker compose run --rm -v "$PWD/backend:/app" api sh -lc \
-  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app pytest -q tests"
+  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app ruff check app tests && PYTHONPATH=/app pytest -q tests"
 ```
 
-Backend lint:
-
-```bash
-docker compose run --rm -v "$PWD/backend:/app" api sh -lc \
-  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app ruff check app tests"
-```
-
-Fast targeted backend test (example):
-
-```bash
-docker compose run --rm -v "$PWD/backend:/app" api sh -lc \
-  "pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && PYTHONPATH=/app pytest -q tests/test_query_service.py"
-```
-
-Frontend checks:
+Frontend:
 
 ```bash
 cd frontend
@@ -87,42 +111,13 @@ npm run lint
 npm run build
 ```
 
-## API quickstart
+## Key Documentation
 
-1. Sync SourceForge trunk + full ingest in one call:
-
-```bash
-curl -X POST 'http://localhost:8000/api/corpus/sourceforge/full-ingest'
-```
-
-2. (Optional) run direct ingest only:
-
-```bash
-curl -X POST 'http://localhost:8000/api/ingest?mode=full'
-```
-
-Every ingest response now includes benchmark telemetry (`started_at`, `completed_at`, `duration_seconds`, `corpus_loc`, `corpus_bytes`), and each run is appended to `backend/data/benchmarks/ingest_runs.jsonl` (or `data/benchmarks/ingest_runs.jsonl` in container runtime).
-
-3. Ask a question:
-
-```bash
-curl -X POST 'http://localhost:8000/api/query' \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"Where is file IO handled?"}'
-```
-
-4. Run a feature query:
-
-```bash
-curl -X POST 'http://localhost:8000/api/features/code_explanation/query' \
-  -H 'Content-Type: application/json' \
-  -d '{"subject":"READ-CUSTOMER"}'
-```
-
-Feature query endpoints are available for advanced workflows, but intentionally not shown in the default UI.
-
-5. Review benchmark history:
-
-```bash
-curl 'http://localhost:8000/api/ingest/runs?limit=20'
-```
+1. Architecture: `docs/architecture.md`
+2. Setup: `docs/setup.md`
+3. Railway runbook: `docs/railway-runbook.md`
+4. Environment URLs/vars: `docs/environments.md`
+5. Corpus source policy: `docs/corpus-source.md`
+6. Evaluation guide: `docs/evaluation.md`
+7. Ingest benchmarks: `docs/ingest-benchmarks.md`
+8. Cost analysis: `docs/cost-analysis.md`

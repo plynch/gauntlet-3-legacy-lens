@@ -64,16 +64,17 @@ VITE_SOURCE_REPO_BASE_URL=https://github.com/<org-or-user>/<repo>/blob/<branch>
 ## Smoke Test Checklist
 
 1. Open frontend URL and verify health panel returns `Status: ok`.
-2. Run ingestion once:
-- `POST https://<api-domain>/api/corpus/sourceforge/full-ingest`
-3. Check ingest benchmark run history:
-- `GET https://<api-domain>/api/ingest/runs?limit=5`
-4. Run query:
-- `POST https://<api-domain>/api/query` with `{"question":"Where is file IO handled?"}`
-5. Confirm response includes:
+2. In browser, click `Sync SourceForge + Reindex` first.
+3. Confirm ingest summary shows timing + corpus metrics in UI.
+4. In browser, run at least 3 queries.
+5. Confirm each response includes:
 - non-empty `answer`
 - `citations`
 - `snippets`
+6. Optional API verification:
+- `POST https://<api-domain>/api/corpus/sourceforge/full-ingest`
+- `GET https://<api-domain>/api/ingest/runs?limit=5`
+- `POST https://<api-domain>/api/query`
 
 ## Promotion Procedure
 

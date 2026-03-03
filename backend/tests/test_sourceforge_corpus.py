@@ -1,16 +1,29 @@
+import subprocess
+from pathlib import Path
+
 import pytest
 
-from app.services.sourceforge_corpus import count_corpus, extract_csrf_token
+from app.services.sourceforge_corpus import count_corpus, run_svn_export
 
 
-def test_extract_csrf_token_parses_hidden_input() -> None:
-    html = '<input name="_csrf_token" type="hidden" value="abc123token">'
-    assert extract_csrf_token(html) == "abc123token"
+def test_run_svn_export_raises_on_missing_binary(monkeypatch, tmp_path) -> None:
+    def fake_run(*_args, **_kwargs):
+        raise FileNotFoundError()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(RuntimeError, match="requires `svn`"):
+        run_svn_export(Path(tmp_path / "trunk"), timeout_seconds=10)
 
 
-def test_extract_csrf_token_raises_on_missing_token() -> None:
-    with pytest.raises(RuntimeError):
-        extract_csrf_token("<html></html>")
+def test_run_svn_export_surfaces_command_failure(monkeypatch, tmp_path) -> None:
+    def fake_run(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(returncode=1, cmd="svn", stderr="fatal: network error")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(RuntimeError, match="fatal: network error"):
+        run_svn_export(Path(tmp_path / "trunk"), timeout_seconds=10)
 
 
 def test_count_corpus_counts_only_supported_extensions(tmp_path) -> None:
