@@ -8,6 +8,56 @@ import {
 } from './lib/api'
 import { ServiceStatusPanel } from './components/ServiceStatusPanel'
 
+const INLINE_CITATION_PATTERN = /\[([A-Za-z0-9_./-]+):(\d+)-(\d+)\]/g
+
+function renderAnswerWithLinks(answer: string) {
+  const matches = Array.from(answer.matchAll(INLINE_CITATION_PATTERN))
+  if (matches.length === 0) {
+    return answer
+  }
+
+  const nodes: Array<string | JSX.Element> = []
+  let cursor = 0
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index]
+    const full = match[0]
+    const path = match[1]
+    const lineStart = Number.parseInt(match[2], 10)
+    const lineEnd = Number.parseInt(match[3], 10)
+    const matchIndex = match.index ?? 0
+
+    if (matchIndex > cursor) {
+      nodes.push(answer.slice(cursor, matchIndex))
+    }
+
+    const link = buildSourceLink(path, lineStart, lineEnd)
+    if (link) {
+      nodes.push(
+        <a
+          key={`answer-citation-${index}-${path}-${lineStart}-${lineEnd}`}
+          href={link}
+          target="_blank"
+          rel="noreferrer"
+          className="answer-inline-link"
+        >
+          {full}
+        </a>,
+      )
+    } else {
+      nodes.push(full)
+    }
+
+    cursor = matchIndex + full.length
+  }
+
+  if (cursor < answer.length) {
+    nodes.push(answer.slice(cursor))
+  }
+
+  return nodes
+}
+
 function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [healthLoading, setHealthLoading] = useState(false)
@@ -100,7 +150,7 @@ function App() {
       {queryResult ? (
         <section>
           <h2>Answer</h2>
-          <pre className="answer-text">{queryResult.answer}</pre>
+          <pre className="answer-text">{renderAnswerWithLinks(queryResult.answer)}</pre>
           {queryResult.insufficient_evidence ? <p>Evidence confidence: low</p> : null}
 
           {queryResult.citations.length > 0 ? (
@@ -109,18 +159,17 @@ function App() {
               <ul>
                 {queryResult.citations.map((citation, index) => {
                   const sourceLink = buildSourceLink(citation.path, citation.line_start, citation.line_end)
+                  const label = `[${index + 1}] ${citation.path}:${citation.line_start}-${citation.line_end}`
                   return (
                     <li key={`${citation.path}-${citation.line_start}-${citation.line_end}`}>
-                      [{index + 1}] {citation.path}:{citation.line_start}-{citation.line_end}
-                      {citation.section ? ` (${citation.section})` : ''}
                       {sourceLink ? (
-                        <>
-                          {' '}
-                          <a href={sourceLink} target="_blank" rel="noreferrer">
-                            open source
-                          </a>
-                        </>
-                      ) : null}
+                        <a href={sourceLink} target="_blank" rel="noreferrer">
+                          {label}
+                        </a>
+                      ) : (
+                        label
+                      )}
+                      {citation.section ? ` (${citation.section})` : ''}
                     </li>
                   )
                 })}
@@ -143,17 +192,15 @@ function App() {
                   >
                     <p>
                       <strong>
-                        {snippet.citation.path}:{snippet.citation.line_start}-{snippet.citation.line_end}
+                        {sourceLink ? (
+                          <a href={sourceLink} target="_blank" rel="noreferrer">
+                            {snippet.citation.path}:{snippet.citation.line_start}-{snippet.citation.line_end}
+                          </a>
+                        ) : (
+                          `${snippet.citation.path}:${snippet.citation.line_start}-${snippet.citation.line_end}`
+                        )}
                       </strong>{' '}
                       score {snippet.score.toFixed(3)}
-                      {sourceLink ? (
-                        <>
-                          {' '}
-                          <a href={sourceLink} target="_blank" rel="noreferrer">
-                            open source
-                          </a>
-                        </>
-                      ) : null}
                     </p>
                     <pre>{snippet.text}</pre>
                   </article>

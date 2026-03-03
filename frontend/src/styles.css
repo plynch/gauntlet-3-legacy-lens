@@ -182,6 +182,11 @@ pre {
   font-size: 0.95rem;
 }
 
+.answer-text a {
+  color: #93c5fd;
+  text-underline-offset: 2px;
+}
+
 a {
   color: #0f172a;
   text-decoration-thickness: 2px;

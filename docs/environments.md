@@ -17,7 +17,7 @@ LEGACYLENS_SOURCE_DIRECTORIES=["data/corpus/sourceforge-trunk"]
 
 # Frontend service
 VITE_API_BASE_URL=https://legacy-lens-api-staging.up.railway.app
-VITE_SOURCE_REPO_BASE_URL=https://github.com/<org-or-user>/<repo>/blob/main
+VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk
 ```
 
 ## Production
@@ -35,7 +35,7 @@ LEGACYLENS_SOURCE_DIRECTORIES=["data/corpus/sourceforge-trunk"]
 
 # Frontend service
 VITE_API_BASE_URL=https://legacy-lens-api.up.railway.app
-VITE_SOURCE_REPO_BASE_URL=https://github.com/<org-or-user>/<repo>/blob/production
+VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk
 ```
 
 ## Update Rule

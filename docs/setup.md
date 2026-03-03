@@ -112,7 +112,7 @@ Required variables:
 - `LEGACYLENS_OPENAI_API_KEY=<secret>` (optional but recommended for generated synthesis)
 2. Frontend service:
 - `VITE_API_BASE_URL=https://<api-domain>`
-- `VITE_SOURCE_REPO_BASE_URL=https://github.com/<org-or-user>/<repo>/blob/<branch>` (optional, enables clickable source links in answer UI)
+- `VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk` (optional override; default already points to SourceForge trunk for clickable source links in UI)
 
 ## Deployment Gate
 

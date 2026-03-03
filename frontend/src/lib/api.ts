@@ -71,6 +71,7 @@ export interface FeatureListResponse {
 }
 
 const fallbackApiBase = 'http://localhost:8000'
+const fallbackSourceRepoBase = 'https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk'
 
 type RuntimeConfig = {
   API_BASE_URL?: string
@@ -113,26 +114,45 @@ function getApiBase(): string {
 }
 
 function getSourceRepoBase(): string {
-  return normalizeOptionalBase(
+  const configuredBase = normalizeOptionalBase(
     getRuntimeConfig()?.SOURCE_REPO_BASE_URL ||
       (import.meta.env.VITE_SOURCE_REPO_BASE_URL as string | undefined),
   )
+  return configuredBase || fallbackSourceRepoBase
+}
+
+function normalizeSourcePath(path: string): string {
+  const trimmed = path.trim().replace(/^\/+/, '')
+  const knownPrefixes = [
+    'backend/data/corpus/sourceforge-trunk/',
+    'data/corpus/sourceforge-trunk/',
+    'sourceforge-trunk/',
+    'trunk/',
+  ]
+
+  for (const prefix of knownPrefixes) {
+    if (trimmed.startsWith(prefix)) {
+      return trimmed.slice(prefix.length)
+    }
+  }
+
+  return trimmed
 }
 
 export function buildSourceLink(path: string, lineStart: number, lineEnd: number): string | null {
   const base = getSourceRepoBase()
-  if (!base) {
-    return null
-  }
-
-  const repoPath = path.startsWith('data/') ? `backend/${path}` : path
+  const repoPath = normalizeSourcePath(path)
+  if (!repoPath) return base
 
   const normalizedPath = repoPath
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/")
 
-  return `${base}/${normalizedPath}#L${lineStart}-L${lineEnd}`
+  const start = Number.isFinite(lineStart) ? Math.max(1, Math.trunc(lineStart)) : 1
+  const end = Number.isFinite(lineEnd) ? Math.max(start, Math.trunc(lineEnd)) : start
+  const rangeFragment = end > start ? `-l${end}` : ''
+  return `${base}/${normalizedPath}?r=HEAD#l${start}${rangeFragment}`
 }
 
 export async function getHealth(): Promise<HealthResponse> {

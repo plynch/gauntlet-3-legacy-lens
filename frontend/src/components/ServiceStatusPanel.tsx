@@ -33,6 +33,23 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds.toFixed(2)}s`
+  }
+  const minutes = Math.floor(seconds / 60)
+  const remainder = seconds - minutes * 60
+  return `${minutes}m ${remainder.toFixed(2)}s`
+}
+
+function formatSecondsPerTenThousandLoc(durationSeconds: number, corpusLoc: number): string {
+  if (corpusLoc <= 0) {
+    return 'n/a'
+  }
+  const secondsPerTenThousand = (durationSeconds * 10000) / corpusLoc
+  return formatDuration(secondsPerTenThousand)
+}
+
 function phaseLabel(phase: PipelinePhase): string {
   switch (phase) {
     case 'syncing':
@@ -110,7 +127,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     setLastIngestMode('full')
     setIngestError('')
     setIngestStats(null)
-    setSyncSummary('')
+    setSyncSummary(`Began syncing SourceForge trunk at ${new Date().toLocaleString()}.`)
     setPipelinePhase('syncing')
     setOperationStartedAt(Date.now())
     setElapsedSeconds(0)
@@ -118,7 +135,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     try {
       const syncStats = await syncSourceForge()
       setSyncSummary(
-        `Synced SourceForge trunk (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(
+        `Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(
           syncStats.synced_at,
         ).toLocaleString()}.`,
       )
@@ -202,13 +219,16 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
           <>
             <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p>
             <ul className="health-list">
-              <li>Mode: {ingestStats.mode}</li>
-              <li>Started: {new Date(ingestStats.started_at).toLocaleString()}</li>
-              <li>Completed: {new Date(ingestStats.completed_at).toLocaleString()}</li>
-              <li>Duration: {ingestStats.duration_seconds.toFixed(2)}s</li>
-              <li>Corpus LOC: {ingestStats.corpus_loc}</li>
-              <li>Corpus size: {formatBytes(ingestStats.corpus_bytes)}</li>
-            </ul>
+                <li>Mode: {ingestStats.mode}</li>
+                <li>Started: {new Date(ingestStats.started_at).toLocaleString()}</li>
+                <li>Completed: {new Date(ingestStats.completed_at).toLocaleString()}</li>
+                <li>Duration: {formatDuration(ingestStats.duration_seconds)}</li>
+                <li>Corpus LOC: {ingestStats.corpus_loc}</li>
+                <li>
+                  Time per 10,000 LOC: {formatSecondsPerTenThousandLoc(ingestStats.duration_seconds, ingestStats.corpus_loc)}
+                </li>
+                <li>Corpus size: {formatBytes(ingestStats.corpus_bytes)}</li>
+              </ul>
           </>
         ) : null}
         {skipWarning ? (
