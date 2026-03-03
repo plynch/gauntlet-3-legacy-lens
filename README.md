@@ -16,6 +16,14 @@ RAG application for understanding legacy COBOL code with grounded evidence.
 - Qdrant vector storage integration
 - Railway-ready deployment for staging and production
 
+## Key docs
+
+1. Architecture: `docs/architecture.md`
+2. Cost analysis: `docs/cost-analysis.md`
+3. Environment URLs and vars: `docs/environments.md`
+4. Railway runbook: `docs/railway-runbook.md`
+5. Evaluation process: `docs/evaluation.md`
+
 ## Run locally
 
 ```bash
