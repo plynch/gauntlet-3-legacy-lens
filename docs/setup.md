@@ -61,6 +61,12 @@ Generate local `.env` files from templates:
 ./scripts/sync-env-files.sh
 ```
 
+Recommended workflow:
+
+1. Keep local `.env.staging` and `.env.production` files updated from templates.
+2. When variables change, paste the relevant file contents into Railway service variables.
+3. Treat Railway as runtime source of truth; keep templates in git for reproducibility.
+
 ## Railway Setup
 
 One Railway project, two environments:
