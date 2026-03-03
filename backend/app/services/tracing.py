@@ -85,7 +85,8 @@ class LangfuseTracer:
         if context_manager is None:
             yield TraceObservation(None)
             return
-        yield from self._enter_context_manager(context_manager)
+        with self._enter_context_manager(context_manager) as observation:
+            yield observation
 
     @contextmanager
     def generation(
@@ -109,7 +110,8 @@ class LangfuseTracer:
             with self.span(name=name, input=input, metadata={"model": model, **(metadata or {})}) as span_observation:
                 yield span_observation
             return
-        yield from self._enter_context_manager(context_manager)
+        with self._enter_context_manager(context_manager) as observation:
+            yield observation
 
     def flush(self) -> None:
         if not self._client:

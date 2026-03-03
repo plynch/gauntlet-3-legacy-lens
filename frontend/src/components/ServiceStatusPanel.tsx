@@ -95,6 +95,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
 
   async function onSourceForgeFullIngestClick() {
     const syncStartedLabel = new Date().toLocaleString()
+    let syncFinishedLabel: string | null = null
     setIngestLoadingMode('full')
     setLastIngestMode('full')
     setIngestError('')
@@ -106,16 +107,27 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
 
     try {
       const syncStats = await syncSourceForge()
+      syncFinishedLabel = new Date(syncStats.synced_at).toLocaleString()
       setSyncSummary(
-        `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(syncStats.synced_at).toLocaleString()}. Full indexing is now running.`,
+        `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${syncFinishedLabel}. Starting full indexing.`,
       )
       setPipelinePhase('indexing')
       const stats = await runIngest('full')
       setIngestStats(stats)
       setLastIndexedAt(stats.completed_at)
       setPipelinePhase('completed')
+      setSyncSummary(
+        `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${syncFinishedLabel}. Full indexing completed at ${new Date(stats.completed_at).toLocaleString()}.`,
+      )
     } catch (err: unknown) {
       setPipelinePhase('failed')
+      if (syncFinishedLabel) {
+        setSyncSummary(
+          `Began SourceForge sync at ${syncStartedLabel}. Finished SourceForge sync at ${syncFinishedLabel}. Full indexing failed before completion.`,
+        )
+      } else {
+        setSyncSummary(`Began SourceForge sync at ${syncStartedLabel}. SourceForge sync failed before completion.`)
+      }
       setIngestError(err instanceof Error ? err.message : 'SourceForge sync + reindex failed')
     } finally {
       setIngestLoadingMode(null)
@@ -155,21 +167,21 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
                 ? 'Syncing + reindexing...'
                 : 'Sync SourceForge + Reindex'}
             </button>
-            <button onClick={() => onIngestClick('incremental')} disabled={isBusy}>
-              {isIndexing && lastIngestMode === 'incremental' ? 'Indexing changes...' : 'Index changes'}
-            </button>
-            <div className="action-stack">
+            <div className="ingest-secondary-actions">
+              <button onClick={() => onIngestClick('incremental')} disabled={isBusy}>
+                {isIndexing && lastIngestMode === 'incremental' ? 'Indexing changes...' : 'Index changes'}
+              </button>
               <button className="secondary-button" onClick={() => onIngestClick('full')} disabled={isBusy}>
                 {isIndexing && lastIngestMode === 'full' ? 'Reindexing...' : 'Reindex all'}
               </button>
-              <p className="last-indexed-note">
-                Last indexed at: {lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : 'not yet indexed'}
-              </p>
+              <button className="secondary-button" onClick={onRefreshHealth} disabled={healthLoading || isBusy}>
+                {healthLoading ? 'Refreshing...' : 'Refresh health'}
+              </button>
             </div>
-            <button className="secondary-button" onClick={onRefreshHealth} disabled={healthLoading || isBusy}>
-              {healthLoading ? 'Refreshing...' : 'Refresh health'}
-            </button>
           </div>
+          <p className="last-indexed-note">
+            Last indexed at: {lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : 'not yet indexed'}
+          </p>
 
           <p className="muted-note">
             Recommended flow: <strong>Sync SourceForge + Reindex</strong> first, then use <strong>Index changes</strong>{' '}
