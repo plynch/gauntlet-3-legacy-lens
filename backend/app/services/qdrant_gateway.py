@@ -39,6 +39,9 @@ class QdrantGateway:
             return False
         return payload.get("file_hash") == file_hash
 
+    def has_points_for_source_path(self, collection_name: str, source_path: str) -> bool:
+        return self._scroll_one_by_path(collection_name, source_path) is not None
+
     def delete_points_for_source_path(self, collection_name: str, source_path: str) -> None:
         response = self._client.post(
             f"/collections/{collection_name}/points/delete?wait=true",

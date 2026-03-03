@@ -83,6 +83,8 @@ class IngestionService:
             overlap_lines=self._settings.chunk_overlap_lines,
         )
         if not chunks:
+            if self._qdrant.has_points_for_source_path(self._settings.qdrant_collection, source.path):
+                self._qdrant.delete_points_for_source_path(self._settings.qdrant_collection, source.path)
             return 0, file_bytes, file_loc
 
         vectors = self._embed_chunks(chunks)

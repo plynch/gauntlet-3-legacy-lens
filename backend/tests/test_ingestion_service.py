@@ -7,8 +7,9 @@ from app.services.types import SourceChunk, SourceFile
 
 
 class FakeQdrantGateway:
-    def __init__(self, should_skip: bool = False) -> None:
+    def __init__(self, should_skip: bool = False, has_existing_points: bool = False) -> None:
         self.should_skip = should_skip
+        self.has_existing_points = has_existing_points
         self.ensure_calls = 0
         self.delete_calls = 0
         self.upsert_calls = 0
@@ -24,6 +25,9 @@ class FakeQdrantGateway:
 
     def upsert_points(self, collection_name: str, chunks: list[SourceChunk], vectors: list[list[float]]) -> None:
         self.upsert_calls += 1
+
+    def has_points_for_source_path(self, collection_name: str, source_path: str) -> bool:
+        return self.has_existing_points
 
 
 class FakeOpenAIGateway:
@@ -116,3 +120,24 @@ def test_ingest_skips_when_no_chunks_emitted(tmp_path) -> None:
     assert stats.files_indexed == 0
     assert stats.files_skipped == 1
     assert qdrant.ensure_calls == 0
+    assert qdrant.delete_calls == 0
+
+
+def test_ingest_deletes_stale_points_when_no_chunks_emitted(tmp_path) -> None:
+    settings = Settings(
+        source_directories="corpus",
+        ingest_benchmark_log_path=str(tmp_path / "benchmarks" / "ingest_runs.jsonl"),
+    )
+    qdrant = FakeQdrantGateway(should_skip=False, has_existing_points=True)
+    service = IngestionService(settings=settings, qdrant=qdrant, openai_gateway=FakeOpenAIGateway())  # type: ignore[arg-type]
+
+    with patch("app.services.ingestion_service.discover_source_files", return_value=[Path("corpus/a.cbl")]), patch(
+        "app.services.ingestion_service.load_source_file",
+        return_value=SourceFile(path="corpus/a.cbl", text="", sha1="sha-a"),
+    ), patch("app.services.ingestion_service.chunk_cobol_source", return_value=[]):
+        stats = service.ingest(mode="full")
+
+    assert stats.files_seen == 1
+    assert stats.files_indexed == 0
+    assert stats.files_skipped == 1
+    assert qdrant.delete_calls == 1
