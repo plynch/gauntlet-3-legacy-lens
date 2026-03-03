@@ -6,6 +6,7 @@ from app.services.types import SourceFile
 
 def discover_source_files(source_directories: list[str], source_extensions: list[str]) -> list[Path]:
     extensions = {normalize_extension(extension) for extension in source_extensions}
+    include_all_extensions = len(extensions) == 0
     results: list[Path] = []
 
     for directory in source_directories:
@@ -14,7 +15,9 @@ def discover_source_files(source_directories: list[str], source_extensions: list
             continue
 
         for path in root.rglob("*"):
-            if path.is_file() and path.suffix.lower() in extensions:
+            if not path.is_file():
+                continue
+            if include_all_extensions or path.suffix.lower() in extensions:
                 results.append(path)
 
     results.sort(key=lambda item: str(item))

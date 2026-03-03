@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     query_top_k: int = 5
     max_context_characters: int = 9000
     source_directories: list[str] = Field(default_factory=lambda: ["data/corpus/sourceforge-trunk"])
-    source_extensions: list[str] = Field(default_factory=lambda: [".cbl", ".cob", ".cpy", ".copy"])
+    source_extensions: list[str] = Field(default_factory=list)
     chunk_max_lines: int = 80
     chunk_overlap_lines: int = 16
     ingest_benchmark_log_path: str = "data/benchmarks/ingest_runs.jsonl"

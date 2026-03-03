@@ -8,7 +8,6 @@ from app.models.corpus import SourceForgeSyncStats
 
 SOURCEFORGE_TREE_URL = "https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/"
 SOURCEFORGE_SVN_TRUNK_URL = "https://svn.code.sf.net/p/gnucobol/code/trunk"
-CORPUS_SUFFIXES = (".cbl", ".cob", ".cpy", ".copy")
 
 
 def sync_sourceforge_trunk(destination_path: str, timeout_seconds: int = 120) -> SourceForgeSyncStats:
@@ -76,7 +75,7 @@ def copy_tree(source: Path, destination: Path) -> None:
 
 
 def count_corpus(directory: Path) -> tuple[int, int, int]:
-    files = [path for path in directory.rglob("*") if path.is_file() and path.suffix.lower() in CORPUS_SUFFIXES]
+    files = [path for path in directory.rglob("*") if path.is_file()]
     total_lines = 0
     total_bytes = 0
 

@@ -16,6 +16,19 @@ def test_discover_source_files_filters_extensions(tmp_path: Path) -> None:
     assert paths == ["a.cbl", "b.COB"]
 
 
+def test_discover_source_files_includes_all_when_extensions_empty(tmp_path: Path) -> None:
+    source_dir = tmp_path / "corpus"
+    source_dir.mkdir()
+    (source_dir / "a.cbl").write_text("A", encoding="utf-8")
+    (source_dir / "readme.txt").write_text("B", encoding="utf-8")
+    (source_dir / "makefile").write_text("C", encoding="utf-8")
+
+    files = discover_source_files([str(source_dir)], [])
+    paths = [path.name for path in files]
+
+    assert paths == ["a.cbl", "makefile", "readme.txt"]
+
+
 def test_normalize_extension_handles_missing_dot() -> None:
     assert normalize_extension("cbl") == ".cbl"
     assert normalize_extension(".cob") == ".cob"

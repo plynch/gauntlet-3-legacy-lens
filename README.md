@@ -38,7 +38,7 @@ Configured ingest directory:
 ## How It Works
 
 1. Sync SourceForge trunk into local/runtime corpus directory.
-2. Chunk COBOL files by paragraph/section boundaries with overlap fallback.
+2. Chunk source files with section-aware boundaries and overlap fallback.
 3. Embed chunks and store vectors + metadata in Qdrant.
 4. On query, embed question, retrieve top-k chunks, generate grounded answer.
 5. Return answer + citations + evidence snippets.

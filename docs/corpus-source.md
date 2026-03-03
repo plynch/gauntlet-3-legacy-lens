@@ -17,7 +17,7 @@ Canonical upstream link:
 2. Confirm corpus path contains files:
 
 ```bash
-find backend/data/corpus/sourceforge-trunk -type f \( -name '*.cbl' -o -name '*.cob' -o -name '*.cpy' -o -name '*.copy' \) | wc -l
+find backend/data/corpus/sourceforge-trunk -type f | wc -l
 ```
 
 3. Run full ingest:
@@ -38,4 +38,5 @@ The backend must point to this directory only:
 
 ```env
 LEGACYLENS_SOURCE_DIRECTORIES=["data/corpus/sourceforge-trunk"]
+LEGACYLENS_SOURCE_EXTENSIONS=[]
 ```
