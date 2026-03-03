@@ -156,9 +156,9 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     try {
       const syncStats = await syncSourceForge()
       setSyncSummary(
-        `Finished SourceForge sync (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(
+        `SourceForge sync complete (${syncStats.files_synced} files, ${syncStats.corpus_loc} LOC) at ${new Date(
           syncStats.synced_at,
-        ).toLocaleString()}.`,
+        ).toLocaleString()}. Full indexing is now running.`,
       )
 
       setPipelinePhase('indexing')
