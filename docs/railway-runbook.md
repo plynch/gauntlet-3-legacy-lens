@@ -71,8 +71,7 @@ VITE_API_BASE_URL=https://<api-domain>
 
 ## Automation
 
-1. CI workflow: `.github/workflows/ci.yml`
-2. Primary deployment mechanism: Railway native GitHub integration per environment/service.
-3. Staging deploys automatically from `main` via Railway.
-4. Production deploys automatically from `production` via Railway.
-5. Keep GitHub Actions focused on validation (CI), not deployment orchestration.
+1. Primary deployment mechanism: Railway native GitHub integration per environment/service.
+2. Staging deploys automatically from `main` via Railway.
+3. Production deploys automatically from `production` via Railway.
+4. No GitHub Actions workflows are required for deployment in this project.
