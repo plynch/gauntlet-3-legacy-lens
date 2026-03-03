@@ -64,6 +64,9 @@ def test_ingest_incremental_skips_matching_file_hash(tmp_path) -> None:
     assert stats.files_seen == 1
     assert stats.files_indexed == 0
     assert stats.files_skipped == 1
+    assert stats.files_unchanged == 1
+    assert stats.files_not_indexable == 0
+    assert stats.skipped_paths == ["corpus/a.cbl (unchanged file hash)"]
     assert qdrant.upsert_calls == 0
 
 
@@ -96,6 +99,8 @@ def test_ingest_full_indexes_chunks_and_creates_collection_once(tmp_path) -> Non
     assert stats.files_seen == 2
     assert stats.files_indexed == 2
     assert stats.files_skipped == 0
+    assert stats.files_unchanged == 0
+    assert stats.files_not_indexable == 0
     assert stats.chunks_indexed == 2
     assert qdrant.ensure_calls == 1
     assert qdrant.delete_calls == 2
@@ -119,6 +124,9 @@ def test_ingest_skips_when_no_chunks_emitted(tmp_path) -> None:
     assert stats.files_seen == 1
     assert stats.files_indexed == 0
     assert stats.files_skipped == 1
+    assert stats.files_unchanged == 0
+    assert stats.files_not_indexable == 1
+    assert stats.skipped_paths == ["corpus/a.cbl (no indexable content)"]
     assert qdrant.ensure_calls == 0
     assert qdrant.delete_calls == 0
 
@@ -140,4 +148,7 @@ def test_ingest_deletes_stale_points_when_no_chunks_emitted(tmp_path) -> None:
     assert stats.files_seen == 1
     assert stats.files_indexed == 0
     assert stats.files_skipped == 1
+    assert stats.files_unchanged == 0
+    assert stats.files_not_indexable == 1
+    assert stats.skipped_paths == ["corpus/a.cbl (no indexable content)"]
     assert qdrant.delete_calls == 1

@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from app.core.settings import Settings
 from app.models.ingest import IngestStats
@@ -28,19 +29,32 @@ class IngestionService:
         files_seen = len(files)
         files_indexed = 0
         files_skipped = 0
+        files_unchanged = 0
+        files_not_indexable = 0
         chunks_indexed = 0
         corpus_bytes = 0
         corpus_loc = 0
+        skipped_paths: list[str] = []
         collection_ready = False
 
         for path in files:
-            indexed_chunks, file_bytes, file_loc = self._ingest_file(
+            indexed_chunks, file_bytes, file_loc, skip_reason = self._ingest_file(
                 path=path, mode=mode, collection_ready=collection_ready
             )
             corpus_bytes += file_bytes
             corpus_loc += file_loc
             if indexed_chunks == 0:
                 files_skipped += 1
+                if skip_reason == "unchanged":
+                    files_unchanged += 1
+                    if len(skipped_paths) < 15:
+                        skipped_paths.append(f"{path} (unchanged file hash)")
+                elif skip_reason == "not_indexable":
+                    files_not_indexable += 1
+                    if len(skipped_paths) < 15:
+                        skipped_paths.append(f"{path} (no indexable content)")
+                elif skip_reason and len(skipped_paths) < 15:
+                    skipped_paths.append(f"{path} ({skip_reason})")
                 continue
 
             files_indexed += 1
@@ -57,9 +71,12 @@ class IngestionService:
             files_seen=files_seen,
             files_indexed=files_indexed,
             files_skipped=files_skipped,
+            files_unchanged=files_unchanged,
+            files_not_indexable=files_not_indexable,
             chunks_indexed=chunks_indexed,
             corpus_bytes=corpus_bytes,
             corpus_loc=corpus_loc,
+            skipped_paths=skipped_paths,
         )
         try:
             append_ingest_run(self._settings.ingest_benchmark_log_path, stats)
@@ -68,14 +85,16 @@ class IngestionService:
             pass
         return stats
 
-    def _ingest_file(self, path: Path, mode: str, collection_ready: bool) -> tuple[int, int, int]:
+    def _ingest_file(
+        self, path: Path, mode: str, collection_ready: bool
+    ) -> tuple[int, int, int, Literal["unchanged", "not_indexable"] | None]:
         source = load_source_file(path)
         file_bytes = len(source.text.encode("utf-8", errors="ignore"))
         file_loc = len(source.text.splitlines())
         if mode == "incremental" and self._qdrant.has_matching_file_hash(
             self._settings.qdrant_collection, source.path, source.sha1
         ):
-            return 0, file_bytes, file_loc
+            return 0, file_bytes, file_loc, "unchanged"
 
         chunks = chunk_cobol_source(
             source=source,
@@ -85,7 +104,7 @@ class IngestionService:
         if not chunks:
             if self._qdrant.has_points_for_source_path(self._settings.qdrant_collection, source.path):
                 self._qdrant.delete_points_for_source_path(self._settings.qdrant_collection, source.path)
-            return 0, file_bytes, file_loc
+            return 0, file_bytes, file_loc, "not_indexable"
 
         vectors = self._embed_chunks(chunks)
         if vectors:
@@ -94,7 +113,7 @@ class IngestionService:
             self._qdrant.delete_points_for_source_path(self._settings.qdrant_collection, source.path)
             self._qdrant.upsert_points(self._settings.qdrant_collection, chunks=chunks, vectors=vectors)
 
-        return len(chunks), file_bytes, file_loc
+        return len(chunks), file_bytes, file_loc, None
 
     def _embed_chunks(self, chunks: list[SourceChunk]) -> list[list[float]]:
         vectors: list[list[float]] = []

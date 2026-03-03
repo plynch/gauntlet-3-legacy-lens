@@ -39,9 +39,12 @@ export interface IngestStats {
   files_seen: number
   files_indexed: number
   files_skipped: number
+  files_unchanged?: number
+  files_not_indexable?: number
   chunks_indexed: number
   corpus_bytes: number
   corpus_loc: number
+  skipped_paths?: string[]
 }
 
 export interface SourceForgeSyncStats {
@@ -76,6 +79,7 @@ const fallbackSourceRepoBase = 'https://sourceforge.net/p/gnucobol/code/HEAD/tre
 type RuntimeConfig = {
   API_BASE_URL?: string
   SOURCE_REPO_BASE_URL?: string
+  ENABLE_INGEST_CONTROLS?: string | boolean
 }
 
 function getRuntimeConfig(): RuntimeConfig | undefined {
@@ -105,6 +109,21 @@ function normalizeOptionalBase(rawValue: string | undefined): string {
       : value
 
   return withoutQuotes.replace(/\/+$/, '')
+}
+
+function parseBooleanFlag(rawValue: string | boolean | undefined, defaultValue: boolean): boolean {
+  if (typeof rawValue === 'boolean') {
+    return rawValue
+  }
+  if (typeof rawValue !== 'string') {
+    return defaultValue
+  }
+
+  const normalized = rawValue.trim().toLowerCase()
+  if (!normalized) return defaultValue
+  if (['0', 'false', 'off', 'no', 'disabled'].includes(normalized)) return false
+  if (['1', 'true', 'on', 'yes', 'enabled'].includes(normalized)) return true
+  return defaultValue
 }
 
 function getApiBase(): string {
@@ -153,6 +172,12 @@ export function buildSourceLink(path: string, lineStart: number, lineEnd: number
   const end = Number.isFinite(lineEnd) ? Math.max(start, Math.trunc(lineEnd)) : start
   const rangeFragment = end > start ? `-l${end}` : ''
   return `${base}/${normalizedPath}?r=HEAD#l${start}${rangeFragment}`
+}
+
+export function areIngestControlsEnabled(): boolean {
+  const runtimeFlag = getRuntimeConfig()?.ENABLE_INGEST_CONTROLS
+  const envFlag = import.meta.env.VITE_ENABLE_INGEST_CONTROLS as string | undefined
+  return parseBooleanFlag(runtimeFlag ?? envFlag, true)
 }
 
 export async function getHealth(): Promise<HealthResponse> {

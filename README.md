@@ -154,8 +154,8 @@ npm run build
 ## Known Limits
 
 1. Retrieval quality depends on chunking and embedding model behavior on mixed source/code assets.
-2. Incremental indexing can skip unchanged files by design.
-3. If any files are skipped unexpectedly, use `Reindex all` and inspect API logs.
+2. Incremental indexing marks unchanged files as `unchanged` by design (not a failure).
+3. Some files may be reported as `not indexable` when they are effectively blank or cannot produce chunks; this is informational.
 
 ## Key Documentation
 

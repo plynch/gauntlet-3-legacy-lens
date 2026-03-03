@@ -113,6 +113,7 @@ Required variables:
 2. Frontend service:
 - `VITE_API_BASE_URL=https://<api-domain>`
 - `VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk` (optional override; default already points to SourceForge trunk for clickable source links in UI)
+- `VITE_ENABLE_INGEST_CONTROLS=true` (set to `false` for viewer-only environments where ingest should stay API/CLI-only)
 
 ## Deployment Gate
 

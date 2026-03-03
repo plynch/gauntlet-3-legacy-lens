@@ -62,6 +62,7 @@ Frontend service:
 ```env
 VITE_API_BASE_URL=https://<api-domain>
 VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk
+VITE_ENABLE_INGEST_CONTROLS=true
 ```
 
 ## Smoke Test Checklist

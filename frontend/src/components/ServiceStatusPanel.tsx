@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { HealthResponse, IngestStats, getIngestRuns, runIngest, syncSourceForge } from '../lib/api'
+import { HealthResponse, IngestStats, areIngestControlsEnabled, getIngestRuns, runIngest, syncSourceForge } from '../lib/api'
 
 type IngestMode = 'full' | 'incremental'
 type PipelinePhase = 'idle' | 'syncing' | 'indexing' | 'completed' | 'failed'
@@ -11,20 +11,48 @@ type ServiceStatusPanelProps = {
   onRefreshHealth: () => Promise<void> | void
 }
 
+function ingestBuckets(stats: IngestStats) {
+  let unchanged = stats.files_unchanged ?? 0
+  let notIndexable = stats.files_not_indexable ?? 0
+  if (unchanged === 0 && notIndexable === 0 && stats.files_skipped > 0) {
+    if (stats.mode === 'incremental') {
+      unchanged = stats.files_skipped
+    } else {
+      notIndexable = stats.files_skipped
+    }
+  }
+  const otherNonIndexed = Math.max(0, stats.files_skipped - unchanged - notIndexable)
+  return { unchanged, notIndexable, otherNonIndexed }
+}
+
 function formatIngestSummary(stats: IngestStats, mode: IngestMode | null): string {
   if (stats.files_seen === 0) {
     return 'No source files were discovered in configured source directories.'
   }
 
+  const { unchanged, notIndexable, otherNonIndexed } = ingestBuckets(stats)
+
   if (stats.files_indexed === 0 && stats.files_skipped === stats.files_seen) {
     if (mode === 'incremental') {
-      return `No changed files detected. ${stats.files_skipped}/${stats.files_seen} files were skipped as unchanged.`
+      return `No changed files detected. ${unchanged}/${stats.files_seen} files were unchanged.`
     }
 
-    return `No chunks were indexed. ${stats.files_skipped}/${stats.files_seen} files were skipped (likely empty or unchunkable).`
+    if (notIndexable === stats.files_seen) {
+      return `No indexable content found. ${notIndexable}/${stats.files_seen} files were empty or not chunkable.`
+    }
+
+    return `No chunks were indexed. ${stats.files_skipped}/${stats.files_seen} files were not indexed.`
   }
 
-  return `Indexed ${stats.files_indexed}/${stats.files_seen} files and ${stats.chunks_indexed} chunks (${stats.files_skipped} skipped).`
+  const details: string[] = []
+  if (unchanged > 0) details.push(`${unchanged} unchanged`)
+  if (notIndexable > 0) details.push(`${notIndexable} not indexable`)
+  if (otherNonIndexed > 0) details.push(`${otherNonIndexed} not indexed`)
+  if (details.length > 0) {
+    return `Indexed ${stats.files_indexed}/${stats.files_seen} files and ${stats.chunks_indexed} chunks (${details.join(', ')}).`
+  }
+
+  return `Indexed ${stats.files_indexed}/${stats.files_seen} files and ${stats.chunks_indexed} chunks.`
 }
 
 function formatBytes(bytes: number): string {
@@ -114,10 +142,15 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
     }
   }, [])
 
-  const skipWarning = useMemo(() => {
-    if (!ingestStats || ingestStats.files_skipped === 0) return null
-    if (ingestStats.mode === 'incremental' && ingestStats.files_indexed === 0) return null
-    return `Skipped ${ingestStats.files_skipped} file(s). Reindex all is recommended to retry skipped files after configuration updates.`
+  const nonIndexableInfo = useMemo(() => {
+    if (!ingestStats) return null
+    const { notIndexable } = ingestBuckets(ingestStats)
+    if (notIndexable === 0) return null
+    return `${notIndexable} file(s) had no indexable content (for example empty placeholders).`
+  }, [ingestStats])
+
+  const nonIndexablePaths = useMemo(() => {
+    return (ingestStats?.skipped_paths ?? []).filter((path) => path.includes('no indexable content')).slice(0, 3)
   }, [ingestStats])
 
   async function onIngestClick(mode: IngestMode) {
@@ -177,6 +210,8 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const isBusy = ingestLoadingMode !== null
   const isSyncing = pipelinePhase === 'syncing'
   const isIndexing = pipelinePhase === 'indexing'
+  const ingestBreakdown = ingestStats ? ingestBuckets(ingestStats) : null
+  const ingestControlsEnabled = areIngestControlsEnabled()
 
   return (
     <section>
@@ -194,79 +229,97 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
         </ul>
       ) : null}
 
-      <div className="ingest-actions">
-        <button className="primary-action" onClick={onSourceForgeFullIngestClick} disabled={isBusy}>
-          {isSyncing || (isIndexing && lastIngestMode === 'full')
-            ? 'Syncing + reindexing...'
-            : 'Sync SourceForge + Reindex'}
-        </button>
-        <button onClick={() => onIngestClick('incremental')} disabled={isBusy}>
-          {isIndexing && lastIngestMode === 'incremental' ? 'Indexing changes...' : 'Index changes'}
-        </button>
-        <div className="action-stack">
-          <button className="secondary-button" onClick={() => onIngestClick('full')} disabled={isBusy}>
-            {isIndexing && lastIngestMode === 'full' ? 'Reindexing...' : 'Reindex all'}
-          </button>
-          <p className="last-indexed-note">
-            Last indexed at: {lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : 'not yet indexed'}
-          </p>
-        </div>
-        <button className="secondary-button" onClick={onRefreshHealth} disabled={healthLoading || isBusy}>
-          {healthLoading ? 'Refreshing...' : 'Refresh health'}
-        </button>
-      </div>
-
-      <p className="muted-note">
-        Recommended flow: <strong>Sync SourceForge + Reindex</strong> first, then use <strong>Index changes</strong>{' '}
-        for routine updates.
-      </p>
-      <p className="muted-note">Full ingest can take 5-10 minutes for the current GnuCOBOL trunk (~572K LOC).</p>
-
-      {pipelinePhase !== 'idle' ? (
-        <div className="progress-panel" aria-live="polite">
-          <div className="progress-header">
-            <strong>{phaseLabel(pipelinePhase)}</strong>
-            <span>{elapsedSeconds}s elapsed</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <ul className="progress-steps">
-            <li className={isSyncing || syncSummary ? 'step-active' : ''}>1. Sync SourceForge trunk</li>
-            <li className={isIndexing || ingestStats ? 'step-active' : ''}>2. Index and embed corpus</li>
-            <li className={pipelinePhase === 'completed' ? 'step-active' : ''}>3. Ready for queries</li>
-          </ul>
-        </div>
-      ) : null}
-
-      <div>
-        {ingestError ? <p role="alert">Indexing issue: {ingestError}</p> : null}
-        {syncSummary ? <p>{syncSummary}</p> : null}
-        {ingestStats ? (
-          <>
-            <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p>
-            <ul className="health-list">
-                <li>Mode: {ingestStats.mode}</li>
-                <li>Started: {new Date(ingestStats.started_at).toLocaleString()}</li>
-                <li>Completed: {new Date(ingestStats.completed_at).toLocaleString()}</li>
-                <li>Duration: {formatDuration(ingestStats.duration_seconds)}</li>
-                <li>Corpus LOC: {ingestStats.corpus_loc}</li>
-                <li>
-                  Time per 10,000 LOC: {formatSecondsPerTenThousandLoc(ingestStats.duration_seconds, ingestStats.corpus_loc)}
-                </li>
-                <li>Corpus size: {formatBytes(ingestStats.corpus_bytes)}</li>
-              </ul>
-          </>
-        ) : null}
-        {skipWarning ? (
-          <div className="warning-panel">
-            <p>{skipWarning}</p>
-            <button className="secondary-button" onClick={() => onIngestClick('full')} disabled={isBusy}>
-              Reindex now
+      {ingestControlsEnabled ? (
+        <>
+          <div className="ingest-actions">
+            <button className="primary-action" onClick={onSourceForgeFullIngestClick} disabled={isBusy}>
+              {isSyncing || (isIndexing && lastIngestMode === 'full')
+                ? 'Syncing + reindexing...'
+                : 'Sync SourceForge + Reindex'}
+            </button>
+            <button onClick={() => onIngestClick('incremental')} disabled={isBusy}>
+              {isIndexing && lastIngestMode === 'incremental' ? 'Indexing changes...' : 'Index changes'}
+            </button>
+            <div className="action-stack">
+              <button className="secondary-button" onClick={() => onIngestClick('full')} disabled={isBusy}>
+                {isIndexing && lastIngestMode === 'full' ? 'Reindexing...' : 'Reindex all'}
+              </button>
+              <p className="last-indexed-note">
+                Last indexed at: {lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : 'not yet indexed'}
+              </p>
+            </div>
+            <button className="secondary-button" onClick={onRefreshHealth} disabled={healthLoading || isBusy}>
+              {healthLoading ? 'Refreshing...' : 'Refresh health'}
             </button>
           </div>
-        ) : null}
-      </div>
+
+          <p className="muted-note">
+            Recommended flow: <strong>Sync SourceForge + Reindex</strong> first, then use <strong>Index changes</strong>{' '}
+            for routine updates.
+          </p>
+          <p className="muted-note">Full ingest can take 5-10 minutes for the current GnuCOBOL trunk (~572K LOC).</p>
+
+          {pipelinePhase !== 'idle' ? (
+            <div className="progress-panel" aria-live="polite">
+              <div className="progress-header">
+                <strong>{phaseLabel(pipelinePhase)}</strong>
+                <span>{elapsedSeconds}s elapsed</span>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+              <ul className="progress-steps">
+                <li className={isSyncing || syncSummary ? 'step-active' : ''}>1. Sync SourceForge trunk</li>
+                <li className={isIndexing || ingestStats ? 'step-active' : ''}>2. Index and embed corpus</li>
+                <li className={pipelinePhase === 'completed' ? 'step-active' : ''}>3. Ready for queries</li>
+              </ul>
+            </div>
+          ) : null}
+
+          <div>
+            {ingestError ? <p role="alert">Indexing issue: {ingestError}</p> : null}
+            {syncSummary ? <p>{syncSummary}</p> : null}
+            {ingestStats ? (
+              <>
+                <p>{formatIngestSummary(ingestStats, lastIngestMode)}</p>
+                <ul className="health-list">
+                  <li>Mode: {ingestStats.mode}</li>
+                  <li>Started: {new Date(ingestStats.started_at).toLocaleString()}</li>
+                  <li>Completed: {new Date(ingestStats.completed_at).toLocaleString()}</li>
+                  <li>Duration: {formatDuration(ingestStats.duration_seconds)}</li>
+                  <li>Corpus LOC: {ingestStats.corpus_loc}</li>
+                  <li>
+                    Time per 10,000 LOC:{' '}
+                    {formatSecondsPerTenThousandLoc(ingestStats.duration_seconds, ingestStats.corpus_loc)}
+                  </li>
+                  <li>Corpus size: {formatBytes(ingestStats.corpus_bytes)}</li>
+                  {ingestBreakdown?.unchanged ? <li>Unchanged files: {ingestBreakdown.unchanged}</li> : null}
+                  {ingestBreakdown?.notIndexable ? (
+                    <li>Not indexable files: {ingestBreakdown.notIndexable} (for example empty placeholders)</li>
+                  ) : null}
+                  {ingestBreakdown?.otherNonIndexed ? <li>Other non-indexed files: {ingestBreakdown.otherNonIndexed}</li> : null}
+                </ul>
+              </>
+            ) : null}
+            {nonIndexableInfo ? (
+              <div className="info-panel">
+                <p>{nonIndexableInfo}</p>
+                {nonIndexablePaths.length ? (
+                  <ul className="health-list">
+                    {nonIndexablePaths.map((path) => (
+                      <li key={path}>{path}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <p className="muted-note">
+          Ingest controls are disabled in this deployment. Use API or CLI ingest for controlled indexing workflows.
+        </p>
+      )}
     </section>
   )
 }

@@ -7,4 +7,5 @@ interface ImportMeta {
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
   readonly VITE_SOURCE_REPO_BASE_URL?: string
+  readonly VITE_ENABLE_INGEST_CONTROLS?: string
 }
