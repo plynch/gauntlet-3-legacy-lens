@@ -168,6 +168,12 @@ button:disabled {
   font-size: 0.92rem;
 }
 
+.query-shortcut-hint {
+  margin: 0.45rem 0 0.2rem;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
 .health-list {
   margin-top: 0;
 }

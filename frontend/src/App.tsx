@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import {
   HealthResponse,
   QueryResponse,
@@ -66,6 +66,8 @@ function App() {
   const [queryLoading, setQueryLoading] = useState(false)
   const [queryError, setQueryError] = useState<string>('')
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
+  const [queryHintVisible, setQueryHintVisible] = useState(false)
+  const queryHintTimeoutRef = useRef<number | null>(null)
 
   async function loadHealth() {
     setHealthLoading(true)
@@ -85,8 +87,26 @@ function App() {
     loadHealth()
   }, [])
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  useEffect(() => {
+    return () => {
+      if (queryHintTimeoutRef.current !== null) {
+        window.clearTimeout(queryHintTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  function showQueryShortcutHint() {
+    setQueryHintVisible(true)
+    if (queryHintTimeoutRef.current !== null) {
+      window.clearTimeout(queryHintTimeoutRef.current)
+    }
+    queryHintTimeoutRef.current = window.setTimeout(() => {
+      setQueryHintVisible(false)
+      queryHintTimeoutRef.current = null
+    }, 2800)
+  }
+
+  async function submitQuery() {
     const trimmedQuery = query.trim()
     if (!trimmedQuery) {
       setQueryError('Please enter a question.')
@@ -106,6 +126,19 @@ function App() {
     } finally {
       setQueryLoading(false)
     }
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await submitQuery()
+  }
+
+  async function onQueryKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || event.shiftKey) {
+      return
+    }
+    event.preventDefault()
+    await submitQuery()
   }
 
   return (
@@ -137,9 +170,12 @@ function App() {
             id="query"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onFocus={showQueryShortcutHint}
+            onKeyDown={onQueryKeyDown}
             rows={4}
             placeholder="e.g., Where is file IO handled?"
           />
+          {queryHintVisible ? <p className="query-shortcut-hint">Enter submits · Shift+Enter adds a newline</p> : null}
           <button type="submit" disabled={queryLoading}>
             {queryLoading ? 'Submitting...' : 'Submit'}
           </button>
