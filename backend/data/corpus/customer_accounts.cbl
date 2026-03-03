@@ -1,0 +1,55 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUSTOMER-ACCOUNTS.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT CUSTOMER-FILE ASSIGN TO "CUSTOMER.DAT"
+               ORGANIZATION IS LINE SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  CUSTOMER-FILE.
+       01  CUSTOMER-RECORD.
+           05 CUST-ID        PIC 9(6).
+           05 CUST-NAME      PIC X(30).
+           05 CUST-BALANCE   PIC S9(7)V99.
+
+       WORKING-STORAGE SECTION.
+       01  WS-EOF            PIC X VALUE "N".
+       01  WS-STATUS-MSG     PIC X(50).
+
+       PROCEDURE DIVISION.
+       MAIN-LOGIC.
+           PERFORM OPEN-FILES
+           PERFORM UNTIL WS-EOF = "Y"
+               PERFORM READ-CUSTOMER
+               IF WS-EOF NOT = "Y"
+                   PERFORM APPLY-ANNUAL-FEE
+                   PERFORM WRITE-STATUS
+               END-IF
+           END-PERFORM
+           PERFORM CLOSE-FILES
+           GOBACK.
+
+       OPEN-FILES.
+           OPEN INPUT CUSTOMER-FILE.
+
+       READ-CUSTOMER.
+           READ CUSTOMER-FILE
+               AT END
+                   MOVE "Y" TO WS-EOF
+           END-READ.
+
+       APPLY-ANNUAL-FEE.
+           SUBTRACT 15.00 FROM CUST-BALANCE.
+
+       WRITE-STATUS.
+           STRING "UPDATED CUSTOMER " DELIMITED BY SIZE
+                  CUST-ID DELIMITED BY SIZE
+                  INTO WS-STATUS-MSG
+           END-STRING
+           DISPLAY WS-STATUS-MSG.
+
+       CLOSE-FILES.
+           CLOSE CUSTOMER-FILE.

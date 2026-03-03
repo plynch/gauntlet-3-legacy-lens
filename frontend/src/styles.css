@@ -49,3 +49,26 @@ button {
   color: #fff;
   padding: 0.55rem 0.9rem;
 }
+
+button:disabled {
+  opacity: 0.6;
+}
+
+article {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #f8fafc;
+}
+
+pre {
+  margin: 0;
+  padding: 0.6rem;
+  overflow-x: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}

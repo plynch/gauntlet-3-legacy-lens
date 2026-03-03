@@ -5,6 +5,39 @@ export interface HealthResponse {
   qdrant_configured: boolean
 }
 
+export interface QueryRequest {
+  question: string
+  top_k?: number
+}
+
+export interface Citation {
+  path: string
+  line_start: number
+  line_end: number
+  section?: string | null
+}
+
+export interface RetrievedSnippet {
+  text: string
+  score: number
+  citation: Citation
+}
+
+export interface QueryResponse {
+  question: string
+  answer: string
+  insufficient_evidence: boolean
+  snippets: RetrievedSnippet[]
+  citations: Citation[]
+}
+
+export interface IngestStats {
+  files_seen: number
+  files_indexed: number
+  files_skipped: number
+  chunks_indexed: number
+}
+
 const fallbackApiBase = 'http://localhost:8000'
 
 type RuntimeConfig = {
@@ -28,14 +61,59 @@ function normalizeApiBase(rawValue: string | undefined): string {
   return withoutQuotes.replace(/\/+$/, '')
 }
 
-export async function getHealth(): Promise<HealthResponse> {
-  const apiBase = normalizeApiBase(
+function getApiBase(): string {
+  return normalizeApiBase(
     getRuntimeConfig()?.API_BASE_URL || (import.meta.env.VITE_API_BASE_URL as string | undefined),
   )
-  const response = await fetch(`${apiBase}/api/health`)
+}
+
+export async function getHealth(): Promise<HealthResponse> {
+  const response = await fetch(`${getApiBase()}/api/health`)
 
   if (!response.ok) {
     throw new Error(`Health endpoint returned ${response.status}`)
+  }
+
+  return response.json()
+}
+
+export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
+  const response = await fetch(`${getApiBase()}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    let detail = `Query endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep the default error string when body is not JSON.
+    }
+    throw new Error(detail)
+  }
+
+  return response.json()
+}
+
+export async function runIngest(mode: 'full' | 'incremental' = 'incremental'): Promise<IngestStats> {
+  const response = await fetch(`${getApiBase()}/api/ingest?mode=${mode}`, { method: 'POST' })
+
+  if (!response.ok) {
+    let detail = `Ingest endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep default message if response body is not JSON.
+    }
+    throw new Error(detail)
   }
 
   return response.json()
