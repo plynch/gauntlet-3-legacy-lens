@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -5,11 +6,12 @@ from fastapi import APIRouter, HTTPException
 from app.core.settings import Settings
 from app.models.corpus import SourceForgeFullIngestResponse, SourceForgeSyncStats
 from app.models.features import FeatureListResponse, FeatureQueryRequest
-from app.models.ingest import IngestStats
+from app.models.ingest import IngestStats, IngestStatus
 from app.models.query import QueryRequest, QueryResponse
 from app.services.feature_catalog import build_feature_question, has_feature, list_features
 from app.services.ingest_benchmarks import read_ingest_runs
 from app.services.ingestion_service import IngestionService
+from app.services.ingest_status_store import ingest_status_store
 from app.services.query_service import QueryService
 from app.services.runtime import runtime_services
 from app.services.sourceforge_corpus import sync_sourceforge_trunk
@@ -40,6 +42,9 @@ def run_query(payload: QueryRequest) -> QueryResponse:
 
 @router.post("/ingest", response_model=IngestStats)
 def run_ingest(mode: Literal["full", "incremental"] = "incremental") -> IngestStats:
+    started_label = datetime.now().astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+    if not ingest_status_store.try_begin(mode=mode, phase="indexing", summary=f"Began {mode} ingest at {started_label}."):
+        raise HTTPException(status_code=409, detail=_ingest_busy_detail())
     try:
         with runtime_services(settings) as services:
             ingestion_service = IngestionService(
@@ -48,8 +53,14 @@ def run_ingest(mode: Literal["full", "incremental"] = "incremental") -> IngestSt
                 openai_gateway=services.openai_gateway,
                 tracer=getattr(services, "tracer", None),
             )
-            return ingestion_service.ingest(mode=mode)
+            stats = ingestion_service.ingest(mode=mode)
+        ingest_status_store.mark_completed(
+            stats,
+            summary=f"Began {mode} ingest at {started_label}. Ingest completed at {stats.completed_at.astimezone().strftime('%-m/%-d/%Y, %-I:%M:%S %p')}.",
+        )
+        return stats
     except Exception as exc:  # pragma: no cover - handled by integration testing
+        ingest_status_store.mark_failed(error=f"Ingestion failed: {exc}", stage="indexing")
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
 
 
@@ -60,20 +71,64 @@ def get_ingest_runs(limit: int | None = None) -> list[IngestStats]:
     return read_ingest_runs(settings.ingest_benchmark_log_path, limit=capped_limit)
 
 
+@router.get("/ingest/status", response_model=IngestStatus)
+def get_ingest_status() -> IngestStatus:
+    return ingest_status_store.snapshot(benchmark_log_path=settings.ingest_benchmark_log_path)
+
+
 @router.post("/corpus/sourceforge/sync", response_model=SourceForgeSyncStats)
 def sync_sourceforge() -> SourceForgeSyncStats:
+    sync_started_label = datetime.now().astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+    if not ingest_status_store.try_begin(
+        mode="full",
+        phase="syncing",
+        summary=f"Began SourceForge sync at {sync_started_label}.",
+    ):
+        raise HTTPException(status_code=409, detail=_ingest_busy_detail())
     try:
         destination = settings.source_directories[0]
-        return sync_sourceforge_trunk(destination, timeout_seconds=settings.sourceforge_sync_timeout_seconds)
+        sync_stats = sync_sourceforge_trunk(destination, timeout_seconds=settings.sourceforge_sync_timeout_seconds)
+        sync_completed_label = sync_stats.synced_at.astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+        ingest_status_store.mark_sync_only_completed(
+            sync_stats,
+            summary=(
+                f"Began SourceForge sync at {sync_started_label}. "
+                f"Finished SourceForge sync ({sync_stats.files_synced} files, {sync_stats.corpus_loc} LOC) at {sync_completed_label}."
+            ),
+        )
+        return sync_stats
     except Exception as exc:  # pragma: no cover - handled by integration testing
+        ingest_status_store.mark_failed(
+            error=f"SourceForge sync failed: {exc}",
+            stage="sync",
+            summary=f"Began SourceForge sync at {sync_started_label}. SourceForge sync failed before completion.",
+        )
         raise HTTPException(status_code=500, detail=f"SourceForge sync failed: {exc}") from exc
 
 
 @router.post("/corpus/sourceforge/full-ingest", response_model=SourceForgeFullIngestResponse)
 def sourceforge_full_ingest() -> SourceForgeFullIngestResponse:
+    sync_started_label = datetime.now().astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+    if not ingest_status_store.try_begin(
+        mode="full",
+        phase="syncing",
+        summary=f"Began SourceForge sync at {sync_started_label}.",
+    ):
+        raise HTTPException(status_code=409, detail=_ingest_busy_detail())
+    sync_completed_label: str | None = None
     try:
         destination = settings.source_directories[0]
         sync_stats = sync_sourceforge_trunk(destination, timeout_seconds=settings.sourceforge_sync_timeout_seconds)
+        sync_completed_label = sync_stats.synced_at.astimezone().strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+        ingest_status_store.mark_sync_completed(
+            sync_stats,
+            summary=(
+                f"Began SourceForge sync at {sync_started_label}. "
+                f"Finished SourceForge sync ({sync_stats.files_synced} files, {sync_stats.corpus_loc} LOC) at {sync_completed_label}. "
+                "Starting full indexing."
+            ),
+        )
+        ingest_status_store.mark_indexing_started()
         with runtime_services(settings) as services:
             ingestion_service = IngestionService(
                 settings=services.settings,
@@ -82,8 +137,31 @@ def sourceforge_full_ingest() -> SourceForgeFullIngestResponse:
                 tracer=getattr(services, "tracer", None),
             )
             ingest_stats = ingestion_service.ingest(mode="full")
+        ingest_status_store.mark_completed(
+            ingest_stats,
+            summary=(
+                f"Began SourceForge sync at {sync_started_label}. "
+                f"Finished SourceForge sync ({sync_stats.files_synced} files, {sync_stats.corpus_loc} LOC) at {sync_completed_label}. "
+                f"Full indexing completed at {ingest_stats.completed_at.astimezone().strftime('%-m/%-d/%Y, %-I:%M:%S %p')}."
+            ),
+        )
         return SourceForgeFullIngestResponse(sync=sync_stats, ingest=ingest_stats)
     except Exception as exc:  # pragma: no cover - handled by integration testing
+        if sync_completed_label is None:
+            ingest_status_store.mark_failed(
+                error=f"SourceForge full ingest failed: {exc}",
+                stage="sync",
+                summary=f"Began SourceForge sync at {sync_started_label}. SourceForge sync failed before completion.",
+            )
+        else:
+            ingest_status_store.mark_failed(
+                error=f"SourceForge full ingest failed: {exc}",
+                stage="indexing",
+                summary=(
+                    f"Began SourceForge sync at {sync_started_label}. "
+                    f"Finished SourceForge sync at {sync_completed_label}. Full indexing failed before completion."
+                ),
+            )
         raise HTTPException(status_code=500, detail=f"SourceForge full ingest failed: {exc}") from exc
 
 
@@ -104,3 +182,10 @@ def run_feature_query(feature_key: str, payload: FeatureQueryRequest) -> QueryRe
             return query_service.answer(question=question, top_k=payload.top_k)
     except Exception as exc:  # pragma: no cover - handled by integration testing
         raise HTTPException(status_code=500, detail=f"Feature query failed: {exc}") from exc
+
+
+def _ingest_busy_detail() -> str:
+    status = ingest_status_store.snapshot(benchmark_log_path=settings.ingest_benchmark_log_path)
+    phase = status.phase.replace("_", " ")
+    mode = status.mode or "unknown"
+    return f"Another ingest operation is already in progress (mode={mode}, phase={phase})."

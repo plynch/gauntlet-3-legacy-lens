@@ -2,14 +2,21 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
+import pytest
 
 import app.api.query as query_api
 from app.main import app
 from app.models.corpus import SourceForgeSyncStats
 from app.models.ingest import IngestStats
 from app.models.query import Citation, QueryResponse, RetrievedSnippet
+from app.services.ingest_status_store import IngestStatusStore
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_ingest_status_store(monkeypatch):
+    monkeypatch.setattr(query_api, "ingest_status_store", IngestStatusStore())
 
 
 class FakeQueryService:
@@ -98,6 +105,15 @@ def test_post_ingest_route_returns_stats(monkeypatch) -> None:
     assert payload["corpus_loc"] == 120
 
 
+def test_post_ingest_route_rejects_when_ingest_already_running() -> None:
+    query_api.ingest_status_store.try_begin(mode="full", phase="indexing", summary="In progress.")
+
+    response = client.post("/api/ingest?mode=incremental")
+
+    assert response.status_code == 409
+    assert "already in progress" in response.json()["detail"]
+
+
 def test_get_ingest_runs_route_returns_history(monkeypatch) -> None:
     stats_payload = IngestStats(
         mode="full",
@@ -120,6 +136,31 @@ def test_get_ingest_runs_route_returns_history(monkeypatch) -> None:
     assert len(payload) == 1
     assert payload[0]["mode"] == "full"
     assert payload[0]["corpus_bytes"] == 4096
+
+
+def test_get_ingest_status_route_returns_snapshot() -> None:
+    stats_payload = IngestStats(
+        mode="full",
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+        duration_seconds=2.4,
+        files_seen=2,
+        files_indexed=2,
+        files_skipped=0,
+        chunks_indexed=11,
+        corpus_bytes=4096,
+        corpus_loc=300,
+    )
+    query_api.ingest_status_store.try_begin(mode="full", phase="indexing", summary="Began ingest.")
+    query_api.ingest_status_store.mark_completed(stats_payload, summary="Completed ingest.")
+
+    response = client.get("/api/ingest/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["phase"] == "completed"
+    assert payload["active"] is False
+    assert payload["ingest_stats"]["chunks_indexed"] == 11
 
 
 def test_sync_sourceforge_route_returns_stats(monkeypatch) -> None:

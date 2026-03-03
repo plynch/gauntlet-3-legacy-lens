@@ -47,6 +47,24 @@ export interface IngestStats {
   skipped_paths?: string[]
 }
 
+export interface IngestStatus {
+  active: boolean
+  phase: 'idle' | 'syncing' | 'indexing' | 'completed' | 'failed'
+  mode: 'full' | 'incremental' | null
+  started_at: string | null
+  updated_at: string
+  sync_started_at: string | null
+  sync_completed_at: string | null
+  sync_files_synced: number | null
+  sync_corpus_loc: number | null
+  sync_corpus_bytes: number | null
+  ingest_stats: IngestStats | null
+  last_indexed_at: string | null
+  summary: string | null
+  error: string | null
+  error_stage: 'sync' | 'indexing' | null
+}
+
 export interface SourceForgeSyncStats {
   source_url: string
   destination_path: string
@@ -238,6 +256,25 @@ export async function getIngestRuns(limit = 5): Promise<IngestStats[]> {
 
   if (!response.ok) {
     let detail = `Ingest history endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep default message if response body is not JSON.
+    }
+    throw new Error(detail)
+  }
+
+  return response.json()
+}
+
+export async function getIngestStatus(): Promise<IngestStatus> {
+  const response = await fetch(`${getApiBase()}/api/ingest/status`)
+
+  if (!response.ok) {
+    let detail = `Ingest status endpoint returned ${response.status}`
     try {
       const payload = (await response.json()) as { detail?: string }
       if (payload.detail) {

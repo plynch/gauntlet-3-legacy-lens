@@ -62,11 +62,19 @@ pre {
 .status-sidebar.collapsed {
   justify-self: end;
   width: max-content;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .status-sidebar .sidebar-toggle {
   width: 100%;
   white-space: nowrap;
+}
+
+.status-sidebar.collapsed .status-panel {
+  display: none;
 }
 
 .status-sidebar section {

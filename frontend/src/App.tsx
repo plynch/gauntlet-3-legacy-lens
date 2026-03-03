@@ -256,14 +256,12 @@ function App() {
           >
             {sidebarCollapsed ? 'Show status + ingest' : 'Hide status + ingest'}
           </button>
-          {!sidebarCollapsed ? (
-            <ServiceStatusPanel
-              health={health}
-              healthLoading={healthLoading}
-              healthError={healthError}
-              onRefreshHealth={loadHealth}
-            />
-          ) : null}
+          <ServiceStatusPanel
+            health={health}
+            healthLoading={healthLoading}
+            healthError={healthError}
+            onRefreshHealth={loadHealth}
+          />
         </aside>
       </div>
     </main>

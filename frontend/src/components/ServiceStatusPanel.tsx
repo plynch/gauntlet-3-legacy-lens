@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
-import { HealthResponse, IngestStats, areIngestControlsEnabled, getIngestRuns, runIngest, syncSourceForge } from '../lib/api'
+import { useEffect, useState } from 'react'
+import {
+  HealthResponse,
+  IngestStats,
+  IngestStatus,
+  areIngestControlsEnabled,
+  getIngestStatus,
+  runIngest,
+  syncSourceForge,
+} from '../lib/api'
 import {
   IngestMode,
   PipelinePhase,
@@ -30,6 +38,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [lastIndexedAt, setLastIndexedAt] = useState<string | null>(null)
+  const [statusLoaded, setStatusLoaded] = useState(false)
 
   useEffect(() => {
     if (!operationStartedAt || (pipelinePhase !== 'syncing' && pipelinePhase !== 'indexing')) {
@@ -43,32 +52,67 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
 
   useEffect(() => {
     let cancelled = false
-    async function loadLastIngestRun() {
+    let intervalId: number | undefined
+    async function pollIngestStatus() {
       try {
-        const runs = await getIngestRuns(1)
-        if (cancelled || runs.length === 0) return
-        setLastIndexedAt(runs[0].completed_at)
+        const status = await getIngestStatus()
+        if (cancelled) return
+        hydrateFromSharedStatus(status)
+        setStatusLoaded(true)
       } catch {
-        // Keep label quiet if history endpoint is unavailable.
+        // Status polling should not block query UX.
       }
     }
 
-    loadLastIngestRun()
+    pollIngestStatus()
+    intervalId = window.setInterval(() => {
+      void pollIngestStatus()
+    }, 3000)
+
     return () => {
       cancelled = true
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId)
+      }
     }
   }, [])
 
-  const nonIndexableInfo = useMemo(() => {
-    if (!ingestStats) return null
-    const { notIndexable } = ingestBuckets(ingestStats)
-    if (notIndexable === 0) return null
-    return `${notIndexable} file(s) had no indexable content (for example empty placeholders).`
-  }, [ingestStats])
+  function hydrateFromSharedStatus(status: IngestStatus) {
+    setPipelinePhase(status.phase)
+    setLastIngestMode(status.mode)
+    setIngestStats(status.ingest_stats)
+    setIngestError(status.error || '')
+    setSyncSummary(status.summary || '')
+    setLastIndexedAt(status.last_indexed_at || status.ingest_stats?.completed_at || null)
 
-  const nonIndexablePaths = useMemo(() => {
-    return (ingestStats?.skipped_paths ?? []).filter((path) => path.includes('no indexable content')).slice(0, 3)
-  }, [ingestStats])
+    if (status.active && status.started_at) {
+      const startedAtMs = new Date(status.started_at).getTime()
+      if (!Number.isNaN(startedAtMs)) {
+        setOperationStartedAt(startedAtMs)
+        setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
+      }
+    } else {
+      setOperationStartedAt(null)
+      setElapsedSeconds(0)
+    }
+
+    setIngestLoadingMode(status.active ? status.mode : null)
+  }
+
+  async function refreshSharedStatus() {
+    try {
+      const status = await getIngestStatus()
+      hydrateFromSharedStatus(status)
+      setStatusLoaded(true)
+    } catch {
+      // Keep existing state when status endpoint is temporarily unavailable.
+    }
+  }
+
+  const nonIndexableCount = ingestStats ? ingestBuckets(ingestStats).notIndexable : 0
+  const nonIndexableInfo =
+    nonIndexableCount > 0 ? `${nonIndexableCount} file(s) had no indexable content (for example empty placeholders).` : null
+  const nonIndexablePaths = (ingestStats?.skipped_paths ?? []).filter((path) => path.includes('no indexable content')).slice(0, 3)
 
   async function onIngestClick(mode: IngestMode) {
     setIngestLoadingMode(mode)
@@ -90,6 +134,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
       setIngestError(err instanceof Error ? err.message : 'Ingestion failed')
     } finally {
       setIngestLoadingMode(null)
+      void refreshSharedStatus()
     }
   }
 
@@ -131,6 +176,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
       setIngestError(err instanceof Error ? err.message : 'SourceForge sync + reindex failed')
     } finally {
       setIngestLoadingMode(null)
+      void refreshSharedStatus()
     }
   }
 
@@ -140,6 +186,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
   const isIndexing = pipelinePhase === 'indexing'
   const ingestBreakdown = ingestStats ? ingestBuckets(ingestStats) : null
   const ingestControlsEnabled = areIngestControlsEnabled()
+  const lastIndexedLabel = lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : statusLoaded ? 'not yet indexed' : 'loading...'
 
   return (
     <section className="status-panel">
@@ -179,9 +226,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
               </button>
             </div>
           </div>
-          <p className="last-indexed-note">
-            Last indexed at: {lastIndexedAt ? new Date(lastIndexedAt).toLocaleString() : 'not yet indexed'}
-          </p>
+          <p className="last-indexed-note">Last indexed at: {lastIndexedLabel}</p>
 
           <p className="muted-note">
             Recommended flow: <strong>Sync SourceForge + Reindex</strong> first, then use <strong>Index changes</strong>{' '}
