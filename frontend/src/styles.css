@@ -82,6 +82,72 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.ingest-actions {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.primary-action {
+  grid-column: 1 / -1;
+  background: #0b3b8f;
+}
+
+.progress-panel {
+  margin-top: 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.92rem;
+}
+
+.progress-track {
+  margin-top: 0.6rem;
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1d4ed8, #2563eb);
+  transition: width 0.4s ease;
+}
+
+.progress-steps {
+  margin: 0.7rem 0 0;
+  padding-left: 1.1rem;
+  color: #64748b;
+}
+
+.step-active {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.warning-panel {
+  margin-top: 0.75rem;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  background: #fffbeb;
+  padding: 0.7rem;
+}
+
+.warning-panel p {
+  margin: 0 0 0.6rem;
+}
+
 .muted-note {
   margin: 0.55rem 0 0;
   color: #475569;
@@ -128,5 +194,9 @@ a {
 
   .shell {
     padding: 1rem;
+  }
+
+  .ingest-actions {
+    grid-template-columns: 1fr;
   }
 }

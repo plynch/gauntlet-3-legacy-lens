@@ -206,6 +206,25 @@ export async function runSourceForgeFullIngest(): Promise<SourceForgeFullIngestR
   return response.json()
 }
 
+export async function syncSourceForge(): Promise<SourceForgeSyncStats> {
+  const response = await fetch(`${getApiBase()}/api/corpus/sourceforge/sync`, { method: 'POST' })
+
+  if (!response.ok) {
+    let detail = `SourceForge sync endpoint returned ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // Keep default message if response body is not JSON.
+    }
+    throw new Error(detail)
+  }
+
+  return response.json()
+}
+
 export async function getFeatures(): Promise<FeatureDefinition[]> {
   const response = await fetch(`${getApiBase()}/api/features`)
 

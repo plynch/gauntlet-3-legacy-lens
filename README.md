@@ -2,6 +2,8 @@
 
 LegacyLens is a browser-based RAG app for understanding large legacy COBOL codebases with grounded evidence.
 
+Primary corpus: [GnuCOBOL SourceForge trunk](https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/).
+
 ## What This Is
 
 1. A public web app where you ask questions about GnuCOBOL source code.
@@ -35,6 +37,11 @@ Configured ingest directory:
 
 - `data/corpus/sourceforge-trunk`
 
+Expected upstream size (latest trunk snapshot during development):
+
+1. Around `418` files.
+2. Around `571,000+` LOC total.
+
 ## How It Works
 
 1. Sync SourceForge trunk into local/runtime corpus directory.
@@ -42,6 +49,19 @@ Configured ingest directory:
 3. Embed chunks and store vectors + metadata in Qdrant.
 4. On query, embed question, retrieve top-k chunks, generate grounded answer.
 5. Return answer + citations + evidence snippets.
+
+## Example Queries (10)
+
+1. Where is file I/O handled in this codebase?
+2. What is the main entry point for `cobc`?
+3. Which modules parse compiler command-line options?
+4. Show error handling flow for failed file opens.
+5. Where are copybooks resolved and loaded?
+6. Which code paths create or modify symbol tables?
+7. How does the runtime initialize before executing user code?
+8. Find call sites related to numeric conversion routines.
+9. What components interact with generated C output?
+10. Show logging or diagnostics pathways used during compilation.
 
 ## Browser-First Staging Workflow (Recommended)
 
@@ -65,6 +85,18 @@ Use this first before CLI or curl checks.
 
 Only after browser flow passes, run API checks if needed.
 
+## MVP/Final Readiness Checklist
+
+1. Public frontend is reachable in browser.
+2. Health panel reports API `Status: ok`.
+3. `Sync SourceForge + Reindex` completes successfully.
+4. Ingest summary reports non-zero files, LOC, and chunks.
+5. Query responses include:
+- grounded answer text
+- citations with file/line ranges
+- evidence snippets
+6. Staging verification is completed before production promotion.
+
 ## API Endpoints
 
 1. `GET /api/health`
@@ -75,6 +107,14 @@ Only after browser flow passes, run API checks if needed.
 6. `POST /api/query`
 7. `GET /api/features`
 8. `POST /api/features/{feature_key}/query`
+
+## Deployment Model
+
+1. Railway `staging` tracks `main`.
+2. Railway `production` tracks `production`.
+3. Promote only after manual staging smoke checks pass.
+
+Detailed steps: `docs/railway-runbook.md`.
 
 ## Local Run
 
@@ -110,6 +150,12 @@ npm ci
 npm run lint
 npm run build
 ```
+
+## Known Limits
+
+1. Retrieval quality depends on chunking and embedding model behavior on mixed source/code assets.
+2. Incremental indexing can skip unchanged files by design.
+3. If any files are skipped unexpectedly, use `Reindex all` and inspect API logs.
 
 ## Key Documentation
 
