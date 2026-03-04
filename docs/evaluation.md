@@ -28,7 +28,7 @@ Staging API:
 python3 scripts/eval/run_eval.py \
   --api-base https://legacy-lens-api-staging.up.railway.app \
   --queries scripts/eval/queries.sample.json \
-  --output-markdown docs/evaluation-results.md
+  --output-markdown docs/evaluation-results-staging.md
 ```
 
 Production API:
@@ -37,7 +37,7 @@ Production API:
 python3 scripts/eval/run_eval.py \
   --api-base https://legacy-lens-api.up.railway.app \
   --queries scripts/eval/queries.sample.json \
-  --output-markdown docs/evaluation-results.md
+  --output-markdown docs/evaluation-results-production.md
 ```
 
 Quick check before running evaluation:
@@ -49,7 +49,7 @@ curl https://legacy-lens-api.up.railway.app/api/health
 
 ## Output
 
-`docs/evaluation-results.md` includes:
+`docs/evaluation-results.md` (whatever you specify after --output-markdown) includes:
 
 1. p50 and p95 latency.
 2. Mean precision@5.
