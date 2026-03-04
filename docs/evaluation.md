@@ -38,6 +38,12 @@ python3 scripts/eval/run_eval.py \
 3. Citation match rate.
 4. Per-query breakdown table.
 
+For live MVP demos, `docs/evaluation-results.md` also records:
+
+1. Staging and production health check evidence.
+2. Full-corpus ingest evidence (files, chunks, LOC, duration).
+3. Representative query API evidence with citation paths.
+
 ## Query Spec Format
 
 Each query JSON row supports:

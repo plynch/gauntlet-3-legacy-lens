@@ -24,7 +24,17 @@ This log records ingest benchmark runs with exact timing and corpus size metrics
 | 2026-03-03T14:43:05.328030Z | 2026-03-03T14:43:05.705830Z | incremental | 9 | 0 | 9 | 0 | 1746 | 69637 | 0.377800 | No file changes between runs (expected all skipped). |
 | 2026-03-03T14:43:58.893385Z | 2026-03-03T14:43:59.274342Z | incremental | 9 | 1 | 8 | 7 | 1747 | 69677 | 0.380957 | One file touched (`numeric-dump.cob`) before run. |
 
+## Submission Evidence: Full SourceForge Trunk
+
+These runs are from the deployed Railway environments after syncing SourceForge trunk.
+
+| Environment | Run started (UTC) | Run ended (UTC) | Mode | Files seen | Files indexed | Files skipped | Chunks indexed | Corpus LOC | Corpus bytes | Duration (s) | Seconds / 10k LOC | Notes |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| staging | 2026-03-03T23:16:44.890214Z | 2026-03-03T23:22:30.600340Z | full | 418 | 417 | 1 | 8929 | 571724 | 18116051 | 345.710126 | 6.05 | `runtime_empty.cfg` reported as no indexable content. |
+| production | 2026-03-03T23:16:19.551005Z | 2026-03-03T23:22:12.379344Z | full | 418 | 417 | 1 | 8929 | 571724 | 18116051 | 352.828339 | 6.17 | Same not-indexable placeholder file. |
+
 ## Notes
 
 - Ingest telemetry is now returned by `POST /api/ingest` and stored in `backend/data/benchmarks/ingest_runs.jsonl`.
 - For large-corpus target testing (for example 10,000 LOC under 5 minutes), point `LEGACYLENS_SOURCE_DIRECTORIES` at the larger corpus and repeat the same benchmark sequence.
+- Target check: `10,000+ LOC < 5 minutes` is met with large margin (`~57x` the target LOC ingested in `~5.8 minutes`).

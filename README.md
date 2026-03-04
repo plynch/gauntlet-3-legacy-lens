@@ -82,6 +82,7 @@ Use this first before CLI or curl checks.
 - non-empty answer
 - citations visible
 - evidence snippets visible
+- demo query presets can prefill prompts (hide/show available)
 
 Only after browser flow passes, run API checks if needed.
 
@@ -96,6 +97,24 @@ Only after browser flow passes, run API checks if needed.
 - citations with file/line ranges
 - evidence snippets
 6. Staging verification is completed before production promotion.
+
+## Latest MVP Evidence Snapshot (March 3, 2026)
+
+Source corpus: [GnuCOBOL SourceForge trunk](https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/)
+
+| Environment | Health | Full ingest result | Corpus LOC | Duration |
+| --- | --- | --- | ---: | ---: |
+| staging | `ok` | `418 seen / 417 indexed / 1 not indexable` | 571724 | 345.71s |
+| production | `ok` | `418 seen / 417 indexed / 1 not indexable` | 571724 | 352.83s |
+
+Not-indexable file:
+
+- `data/corpus/sourceforge-trunk/config/runtime_empty.cfg` (empty placeholder content)
+
+Detailed evidence logs:
+
+1. `docs/ingest-benchmarks.md`
+2. `docs/evaluation-results.md`
 
 ## API Endpoints
 
@@ -176,4 +195,5 @@ npm run build
 5. Corpus source policy: `docs/corpus-source.md`
 6. Evaluation guide: `docs/evaluation.md`
 7. Ingest benchmarks: `docs/ingest-benchmarks.md`
-8. Cost analysis: `docs/cost-analysis.md`
+8. Requirements evidence map: `docs/requirements-evidence-map.md`
+9. Cost analysis: `docs/cost-analysis.md`
