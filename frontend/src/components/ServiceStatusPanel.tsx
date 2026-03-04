@@ -191,6 +191,7 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
           <li>Timestamp: {formatAustinDateTime(health.timestamp)}</li>
         </ul>
       ) : null}
+      <p className="last-indexed-note">Last indexed at: {lastIndexedLabel}</p>
 
       {ingestControlsEnabled ? (
         <>
@@ -212,7 +213,6 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
               </button>
             </div>
           </div>
-          <p className="last-indexed-note">Last indexed at: {lastIndexedLabel}</p>
 
           <p className="muted-note">
             Recommended flow: <strong>Sync SourceForge + Reindex</strong> first, then use <strong>Index changes</strong>{' '}
@@ -277,7 +277,8 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
         </>
       ) : (
         <p className="status-message muted-note">
-          Ingest controls are disabled in this deployment. Use API or CLI ingest for controlled indexing workflows.
+          Ingest controls are disabled in this deployment to limit production cost and prevent accidental reindex runs.
+          Use scheduled API jobs or manual operator-triggered ingest workflows.
         </p>
       )}
     </section>
