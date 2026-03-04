@@ -7,6 +7,7 @@ import {
   runQuery,
 } from './lib/api'
 import { ServiceStatusPanel } from './components/ServiceStatusPanel'
+import { QueryPresets } from './components/QueryPresets'
 
 const INLINE_CITATION_PATTERN = /\[([A-Za-z0-9_./-]+):(\d+)-(\d+)\]/g
 
@@ -69,6 +70,7 @@ function App() {
   const [queryHintVisible, setQueryHintVisible] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const queryHintTimeoutRef = useRef<number | null>(null)
+  const queryTextAreaRef = useRef<HTMLTextAreaElement | null>(null)
 
   async function loadHealth() {
     setHealthLoading(true)
@@ -142,6 +144,14 @@ function App() {
     await submitQuery()
   }
 
+  function onSelectExampleQuery(exampleQuery: string) {
+    setQuery(exampleQuery)
+    setQueryError('')
+    setQueryResult(null)
+    queryTextAreaRef.current?.focus()
+    showQueryShortcutHint()
+  }
+
   return (
     <main className="shell app-shell">
       <header className="app-header">
@@ -163,10 +173,12 @@ function App() {
         <div className="query-column">
           <section className="query-panel surface-card">
             <h2>Query</h2>
+            <QueryPresets onSelectQuery={onSelectExampleQuery} disabled={queryLoading} />
             <form onSubmit={onSubmit}>
               <label htmlFor="query">Ask about the codebase</label>
               <textarea
                 id="query"
+                ref={queryTextAreaRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onFocus={showQueryShortcutHint}

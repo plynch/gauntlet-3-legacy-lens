@@ -49,6 +49,62 @@ pre {
   overflow: auto;
 }
 
+.query-presets {
+  margin-top: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-strong) 82%, white 18%);
+}
+
+.query-presets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.query-presets-header strong {
+  font-size: 0.95rem;
+}
+
+.query-presets-header button {
+  min-height: 2rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.query-presets-grid {
+  margin-top: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.query-preset-button {
+  min-height: 2.3rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #f2f0e4;
+  color: var(--text);
+  justify-content: flex-start;
+  gap: 0.45rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.query-preset-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: #d6ddc3;
+  color: #213427;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
 .status-sidebar {
   position: sticky;
   top: 1rem;
@@ -191,6 +247,10 @@ pre {
 
 @media (max-width: 900px) {
   .ingest-secondary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .query-presets-grid {
     grid-template-columns: 1fr;
   }
 }
