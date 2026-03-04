@@ -58,7 +58,7 @@ export function QueryPresets(props: QueryPresetsProps) {
           ))}
         </div>
       ) : (
-        <p className="muted-note">Examples hidden. Click "Show examples" to bring them back.</p>
+        <p className="muted-note">Examples hidden. Click &quot;Show examples&quot; to bring them back.</p>
       )}
     </section>
   )
