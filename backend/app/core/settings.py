@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 24
     embedding_max_retries: int = 3
     embedding_retry_backoff_seconds: float = 1.5
+    generation_circuit_failure_threshold: int = 3
+    generation_circuit_cooldown_seconds: float = 90.0
     query_top_k: int = 5
     max_context_characters: int = 9000
     source_directories: list[str] = Field(default_factory=lambda: ["data/corpus/sourceforge-trunk"])

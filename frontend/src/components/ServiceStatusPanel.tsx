@@ -184,12 +184,20 @@ export function ServiceStatusPanel(props: ServiceStatusPanelProps) {
           Backend issue: {healthError}
         </p>
       ) : health ? (
-        <ul className="health-list">
-          <li>Status: {health.status}</li>
-          <li>Service: {health.service}</li>
-          <li>Qdrant configured: {health.qdrant_configured ? 'yes' : 'no'}</li>
-          <li>Timestamp: {formatAustinDateTime(health.timestamp)}</li>
-        </ul>
+        <>
+          <ul className="health-list">
+            <li>Status: {health.status}</li>
+            <li>Service: {health.service}</li>
+            <li>Qdrant configured: {health.qdrant_configured ? 'yes' : 'no'}</li>
+            <li>OpenAI mode: {health.openai_mode}</li>
+            <li>Timestamp: {formatAustinDateTime(health.timestamp)}</li>
+          </ul>
+          {health.degraded_reason ? (
+            <p className="status-message status-warning" role="status">
+              Degraded mode: {health.degraded_reason}
+            </p>
+          ) : null}
+        </>
       ) : null}
       <p className="last-indexed-note">Last indexed at: {lastIndexedLabel}</p>
 

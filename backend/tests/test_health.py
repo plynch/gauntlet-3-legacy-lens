@@ -14,3 +14,5 @@ def test_health_check() -> None:
     assert payload["status"] == "ok"
     assert payload["service"] == "LegacyLens API"
     assert payload["qdrant_configured"] is True
+    assert payload["openai_mode"] in {"openai", "fallback"}
+    assert "degraded_reason" in payload

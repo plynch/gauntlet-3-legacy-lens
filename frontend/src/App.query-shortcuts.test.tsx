@@ -23,6 +23,8 @@ describe('App query keyboard shortcuts', () => {
       service: 'LegacyLens API (Test)',
       timestamp: '2026-03-04T18:00:00Z',
       qdrant_configured: true,
+      openai_mode: 'openai',
+      degraded_reason: null,
     })
     runQueryMock.mockResolvedValue({
       question: 'Where is file IO handled?',

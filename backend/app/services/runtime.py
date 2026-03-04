@@ -31,6 +31,8 @@ def runtime_services(settings: Settings) -> Iterator[RuntimeServices]:
         local_embedding_dimensions=settings.local_embedding_dimensions,
         embedding_max_retries=settings.embedding_max_retries,
         embedding_retry_backoff_seconds=settings.embedding_retry_backoff_seconds,
+        generation_circuit_failure_threshold=settings.generation_circuit_failure_threshold,
+        generation_circuit_cooldown_seconds=settings.generation_circuit_cooldown_seconds,
         tracer=tracer,
     )
     try:

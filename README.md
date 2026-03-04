@@ -152,6 +152,8 @@ Detailed evidence logs:
 7. `GET /api/features`
 8. `POST /api/features/{feature_key}/query`
 
+`GET /api/health` now includes `openai_mode` (`openai` or `fallback`) and `degraded_reason` when circuit-breaker fallback is active.
+
 ## Observability (Langfuse)
 
 When `LEGACYLENS_LANGFUSE_BASE_URL`, `LEGACYLENS_LANGFUSE_PUBLIC_KEY`, and `LEGACYLENS_LANGFUSE_SECRET_KEY`

@@ -79,6 +79,27 @@ describe('ServiceStatusPanel ingest transitions', () => {
     getIngestStatusMock.mockResolvedValue(makeIngestStatus())
   })
 
+  it('shows degraded mode warning when health reports fallback mode', () => {
+    render(
+      <ServiceStatusPanel
+        health={{
+          status: 'ok',
+          service: 'LegacyLens API (Test)',
+          timestamp: '2026-03-04T18:00:00Z',
+          qdrant_configured: true,
+          openai_mode: 'fallback',
+          degraded_reason: 'OpenAI generation circuit breaker is open (45s until retry).',
+        }}
+        healthLoading={false}
+        healthError=""
+        onRefreshHealth={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('OpenAI mode: fallback')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Degraded mode: OpenAI generation circuit breaker is open')
+  })
+
   it('shows indexing state and then success summary for incremental ingest', async () => {
     const completedStats = makeStats()
     const deferred = createDeferred<IngestStats>()
@@ -103,6 +124,8 @@ describe('ServiceStatusPanel ingest transitions', () => {
           service: 'LegacyLens API (Test)',
           timestamp: '2026-03-04T18:00:00Z',
           qdrant_configured: true,
+          openai_mode: 'openai',
+          degraded_reason: null,
         }}
         healthLoading={false}
         healthError=""
@@ -138,6 +161,8 @@ describe('ServiceStatusPanel ingest transitions', () => {
           service: 'LegacyLens API (Test)',
           timestamp: '2026-03-04T18:00:00Z',
           qdrant_configured: true,
+          openai_mode: 'openai',
+          degraded_reason: null,
         }}
         healthLoading={false}
         healthError=""

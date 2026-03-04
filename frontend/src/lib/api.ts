@@ -3,6 +3,8 @@ export interface HealthResponse {
   service: string
   timestamp: string
   qdrant_configured: boolean
+  openai_mode: 'openai' | 'fallback'
+  degraded_reason: string | null
 }
 
 export interface QueryRequest {

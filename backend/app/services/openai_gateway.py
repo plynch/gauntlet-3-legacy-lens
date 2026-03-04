@@ -7,6 +7,13 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from app.services.openai_resilience import (
+    OpenAIModeStatus,
+    describe_openai_mode,
+    get_generation_circuit_snapshot,
+    record_generation_failure,
+    record_generation_success,
+)
 from app.services.types import SearchHit
 
 if TYPE_CHECKING:
@@ -21,12 +28,16 @@ class OpenAIGateway:
         local_embedding_dimensions: int = 256,
         embedding_max_retries: int = 3,
         embedding_retry_backoff_seconds: float = 1.5,
+        generation_circuit_failure_threshold: int = 3,
+        generation_circuit_cooldown_seconds: float = 90.0,
         tracer: "LangfuseTracer | None" = None,
     ):
         self._api_key = api_key
         self._local_embedding_dimensions = local_embedding_dimensions
         self._embedding_max_retries = max(1, embedding_max_retries)
         self._embedding_retry_backoff_seconds = max(0.1, embedding_retry_backoff_seconds)
+        self._generation_circuit_failure_threshold = max(1, generation_circuit_failure_threshold)
+        self._generation_circuit_cooldown_seconds = max(1.0, generation_circuit_cooldown_seconds)
         self._client = httpx.Client(timeout=timeout_seconds)
         self._tracer = tracer
 
@@ -36,6 +47,12 @@ class OpenAIGateway:
 
     def close(self) -> None:
         self._client.close()
+
+    def mode_status(self) -> OpenAIModeStatus:
+        return describe_openai_mode(
+            api_key=self._api_key,
+            generation_circuit_snapshot=get_generation_circuit_snapshot(),
+        )
 
     def embed_texts(self, texts: Sequence[str], model: str) -> list[list[float]]:
         if not texts:
@@ -123,6 +140,19 @@ class OpenAIGateway:
                 trace.update(output={"mode": "local-fallback", "answer_preview": answer[:500]})
                 return answer
 
+            circuit_snapshot = get_generation_circuit_snapshot()
+            if circuit_snapshot.is_open:
+                answer = fallback_answer(question, hits)
+                trace.update(
+                    output={
+                        "mode": "fallback_circuit_open",
+                        "answer_preview": answer[:500],
+                        "seconds_until_retry": circuit_snapshot.seconds_remaining,
+                        "last_error": circuit_snapshot.last_error,
+                    }
+                )
+                return answer
+
             context = build_context(hits, max_context_characters=max_context_characters)
             system_prompt = (
                 "You answer questions about a codebase using only provided evidence. "
@@ -131,19 +161,35 @@ class OpenAIGateway:
             )
             user_prompt = f"Question:\n{question}\n\nEvidence:\n{context}"
 
-            response = self._client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": model,
-                    "temperature": 0.1,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                },
-            )
+            try:
+                response = self._client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": model,
+                        "temperature": 0.1,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    },
+                )
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                record_generation_failure(
+                    error=str(exc),
+                    threshold=self._generation_circuit_failure_threshold,
+                    cooldown_seconds=self._generation_circuit_cooldown_seconds,
+                )
+                answer = fallback_answer(question, hits)
+                trace.update(output={"mode": "fallback_transport_error", "answer_preview": answer[:500], "error": str(exc)})
+                return answer
+
             if not response.is_success:
+                record_generation_failure(
+                    error=f"{response.status_code} {response.text[:200]}",
+                    threshold=self._generation_circuit_failure_threshold,
+                    cooldown_seconds=self._generation_circuit_cooldown_seconds,
+                )
                 answer = fallback_answer(question, hits)
                 trace.update(
                     output={
@@ -157,10 +203,16 @@ class OpenAIGateway:
             data = response.json()
             choices = data.get("choices", [])
             if not choices:
+                record_generation_failure(
+                    error="empty choices",
+                    threshold=self._generation_circuit_failure_threshold,
+                    cooldown_seconds=self._generation_circuit_cooldown_seconds,
+                )
                 answer = fallback_answer(question, hits)
                 trace.update(output={"mode": "fallback_empty_choices", "answer_preview": answer[:500]})
                 return answer
             answer = choices[0].get("message", {}).get("content", "").strip() or fallback_answer(question, hits)
+            record_generation_success()
             trace.update(output={"mode": "openai", "answer_preview": answer[:500], "choice_count": len(choices)})
             return answer
 
