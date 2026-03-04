@@ -4,6 +4,26 @@ LegacyLens is a browser-based RAG app for understanding large legacy COBOL codeb
 
 Primary corpus: [GnuCOBOL SourceForge trunk](https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/).
 
+## Live Environments
+
+1. Production frontend: [https://legacy-lens.up.railway.app/](https://legacy-lens.up.railway.app/)
+2. Production API: [https://legacy-lens-api.up.railway.app/api/health](https://legacy-lens-api.up.railway.app/api/health)
+3. Staging frontend: [https://legacy-lens-staging.up.railway.app/](https://legacy-lens-staging.up.railway.app/)
+4. Staging API: [https://legacy-lens-api-staging.up.railway.app/api/health](https://legacy-lens-api-staging.up.railway.app/api/health)
+
+## Key Documentation
+
+1. [Architecture](docs/architecture.md)
+2. [Setup Guide](docs/setup.md)
+3. [Railway Runbook](docs/railway-runbook.md)
+4. [Environment URLs and Variables](docs/environments.md)
+5. [Corpus Source Policy](docs/corpus-source.md)
+6. [Evaluation Guide](docs/evaluation.md)
+7. [Evaluation Results](docs/evaluation-results.md)
+8. [Ingest Benchmarks](docs/ingest-benchmarks.md)
+9. [Requirements Evidence Map](docs/requirements-evidence-map.md)
+10. [Cost Analysis](docs/cost-analysis.md)
+
 ## What This Is
 
 1. A public web app where you ask questions about GnuCOBOL source code.
@@ -185,15 +205,3 @@ npm run build
 1. Retrieval quality depends on chunking and embedding model behavior on mixed source/code assets.
 2. Incremental indexing marks unchanged files as `unchanged` by design (not a failure).
 3. Some files may be reported as `not indexable` when they are effectively blank or cannot produce chunks; this is informational.
-
-## Key Documentation
-
-1. Architecture: `docs/architecture.md`
-2. Setup: `docs/setup.md`
-3. Railway runbook: `docs/railway-runbook.md`
-4. Environment URLs/vars: `docs/environments.md`
-5. Corpus source policy: `docs/corpus-source.md`
-6. Evaluation guide: `docs/evaluation.md`
-7. Ingest benchmarks: `docs/ingest-benchmarks.md`
-8. Requirements evidence map: `docs/requirements-evidence-map.md`
-9. Cost analysis: `docs/cost-analysis.md`
