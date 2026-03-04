@@ -11,6 +11,8 @@ Generate reproducible retrieval metrics (latency, precision@5, citation-match ra
 
 ## Run
 
+Run all commands from the repository root (`3-legacy-lens`) in a terminal.
+
 Local API:
 
 ```bash
@@ -24,9 +26,25 @@ Staging API:
 
 ```bash
 python3 scripts/eval/run_eval.py \
-  --api-base https://<staging-api-domain> \
+  --api-base https://legacy-lens-api-staging.up.railway.app \
   --queries scripts/eval/queries.sample.json \
   --output-markdown docs/evaluation-results.md
+```
+
+Production API:
+
+```bash
+python3 scripts/eval/run_eval.py \
+  --api-base https://legacy-lens-api.up.railway.app \
+  --queries scripts/eval/queries.sample.json \
+  --output-markdown docs/evaluation-results.md
+```
+
+Quick check before running evaluation:
+
+```bash
+curl https://legacy-lens-api-staging.up.railway.app/api/health
+curl https://legacy-lens-api.up.railway.app/api/health
 ```
 
 ## Output

@@ -1,18 +1,82 @@
 [
   {
-    "question": "Where is numeric dump behavior implemented?",
-    "expected_path_contains": ["numeric-dump.cob"]
+    "question": "Where is file I/O handled in GnuCOBOL?",
+    "expected_path_contains": ["fileio.c", "foci.c", "focextfh.c"]
   },
   {
-    "question": "Where is numeric display logic implemented?",
-    "expected_path_contains": ["numeric-display.cob"]
+    "question": "Which modules handle indexed or external file handlers?",
+    "expected_path_contains": ["focextfh.c", "fileio.c", "fextfh.c"]
   },
   {
-    "question": "Where is the COBOL tutorial program source?",
-    "expected_path_contains": ["tutorial.cob"]
+    "question": "Where is runtime bootstrap or common runtime setup code located?",
+    "expected_path_contains": ["common.c", "libcob/"]
   },
   {
-    "question": "Where are SQL-related copybook definitions?",
-    "expected_path_contains": ["sqlca.cpy", "sqlda.cpy"]
+    "question": "Where are intrinsic function implementations located?",
+    "expected_path_contains": ["intrinsic.c", "libcob/"]
+  },
+  {
+    "question": "Where is dynamic CALL resolution implemented?",
+    "expected_path_contains": ["call.c", "libcob/"]
+  },
+  {
+    "question": "Where is character set or collation handling implemented?",
+    "expected_path_contains": ["common.c", "move.c", "libcob/"]
+  },
+  {
+    "question": "Where is the compiler entry point for cobc?",
+    "expected_path_contains": ["cobc.c", "cobc/"]
+  },
+  {
+    "question": "Where are command-line options parsed for cobc?",
+    "expected_path_contains": ["cobc.c", "parser.y", "scanner.l", "cobc/"]
+  },
+  {
+    "question": "Where is parser grammar logic for COBOL syntax located?",
+    "expected_path_contains": ["parser.y", "cobc/"]
+  },
+  {
+    "question": "Where is lexical scanning/tokenization logic located?",
+    "expected_path_contains": ["scanner.l", "cobc/"]
+  },
+  {
+    "question": "Where are compiler diagnostics and error messages produced?",
+    "expected_path_contains": ["error.c", "cobc.c", "cobc/"]
+  },
+  {
+    "question": "Where does code generation emit C output?",
+    "expected_path_contains": ["codegen.c", "codegen", "cobc/"]
+  },
+  {
+    "question": "Where are SQL copybook definitions in the source tree?",
+    "expected_path_contains": ["sqlca.cpy", "sqlda.cpy", "copy/"]
+  },
+  {
+    "question": "Where is copybook include resolution handled?",
+    "expected_path_contains": ["parser.y", "cobc.c", "copy/"]
+  },
+  {
+    "question": "Which files define runtime configuration templates?",
+    "expected_path_contains": ["config/", ".cfg", "runtime_empty.cfg"]
+  },
+  {
+    "question": "Where are file status and I/O regression tests defined?",
+    "expected_path_contains": ["testsuite.src/run_file.at", "run_file.at", "testsuite.src/"]
+  },
+  {
+    "question": "Where are test suite scripts for runtime behavior located?",
+    "expected_path_contains": ["testsuite.src/", ".at"]
+  },
+  {
+    "question": "Where is numeric display logic implemented in test or sample COBOL programs?",
+    "expected_path_contains": ["numeric-display.cob", "testsuite.src/"]
+  },
+  {
+    "question": "Where is numeric dump behavior implemented in test COBOL programs?",
+    "expected_path_contains": ["numeric-dump.cob", "testsuite.src/"]
+  },
+  {
+    "question": "Where is the tutorial COBOL program source located?",
+    "expected_path_contains": ["tutorial.cob", "testsuite.src/"]
   }
 ]
