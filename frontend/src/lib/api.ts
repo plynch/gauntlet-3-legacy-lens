@@ -138,7 +138,13 @@ function parseBooleanFlag(rawValue: string | boolean | undefined, defaultValue: 
     return defaultValue
   }
 
-  const normalized = rawValue.trim().toLowerCase()
+  const trimmed = rawValue.trim()
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1)
+      : trimmed
+  const normalized = unquoted.trim().toLowerCase()
   if (!normalized) return defaultValue
   if (['0', 'false', 'off', 'no', 'disabled'].includes(normalized)) return false
   if (['1', 'true', 'on', 'yes', 'enabled'].includes(normalized)) return true
