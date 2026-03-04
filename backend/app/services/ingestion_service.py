@@ -36,6 +36,20 @@ class IngestionService:
             )
 
             files_seen = len(files)
+            if files_seen == 0:
+                configured_paths = ", ".join(self._settings.source_directories)
+                existing_index_present = self._qdrant.has_any_points(self._settings.qdrant_collection)
+                if existing_index_present:
+                    raise RuntimeError(
+                        "No source files were discovered under configured source directories "
+                        f"({configured_paths}). Existing indexed corpus was preserved. "
+                        "Run SourceForge sync before indexing."
+                    )
+                raise RuntimeError(
+                    "No source files were discovered under configured source directories "
+                    f"({configured_paths}). Run SourceForge sync before indexing."
+                )
+
             files_indexed = 0
             files_skipped = 0
             files_unchanged = 0

@@ -1,15 +1,23 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from app.core.settings import Settings
 from app.services.ingestion_service import IngestionService
 from app.services.types import SourceChunk, SourceFile
 
 
 class FakeQdrantGateway:
-    def __init__(self, should_skip: bool = False, has_existing_points: bool = False) -> None:
+    def __init__(
+        self,
+        should_skip: bool = False,
+        has_existing_points: bool = False,
+        has_any_points: bool = False,
+    ) -> None:
         self.should_skip = should_skip
         self.has_existing_points = has_existing_points
+        self.has_any_points_result = has_any_points
         self.drop_collection_calls = 0
         self.ensure_calls = 0
         self.delete_calls = 0
@@ -38,6 +46,9 @@ class FakeQdrantGateway:
 
     def has_points_for_source_path(self, collection_name: str, source_path: str) -> bool:
         return self.has_existing_points
+
+    def has_any_points(self, collection_name: str) -> bool:
+        return self.has_any_points_result
 
 
 class FakeOpenAIGateway:
@@ -166,3 +177,35 @@ def test_ingest_deletes_stale_points_when_no_chunks_emitted(tmp_path) -> None:
     assert stats.skipped_paths == ["corpus/a.cbl (no indexable content)"]
     assert qdrant.drop_collection_calls == 1
     assert qdrant.delete_calls == 1
+
+
+def test_full_ingest_requires_discovered_source_files(tmp_path) -> None:
+    settings = Settings(
+        source_directories=["corpus/missing"],
+        ingest_benchmark_log_path=str(tmp_path / "benchmarks" / "ingest_runs.jsonl"),
+    )
+    qdrant = FakeQdrantGateway(should_skip=False)
+    service = IngestionService(settings=settings, qdrant=qdrant, openai_gateway=FakeOpenAIGateway())  # type: ignore[arg-type]
+
+    with patch("app.services.ingestion_service.discover_source_files", return_value=[]):
+        with pytest.raises(RuntimeError, match="No source files were discovered"):
+            service.ingest(mode="full")
+
+    assert qdrant.drop_collection_calls == 0
+    assert qdrant.ensure_calls == 0
+    assert qdrant.upsert_calls == 0
+
+
+def test_full_ingest_reports_preserved_index_when_files_missing(tmp_path) -> None:
+    settings = Settings(
+        source_directories=["corpus/missing"],
+        ingest_benchmark_log_path=str(tmp_path / "benchmarks" / "ingest_runs.jsonl"),
+    )
+    qdrant = FakeQdrantGateway(should_skip=False, has_any_points=True)
+    service = IngestionService(settings=settings, qdrant=qdrant, openai_gateway=FakeOpenAIGateway())  # type: ignore[arg-type]
+
+    with patch("app.services.ingestion_service.discover_source_files", return_value=[]):
+        with pytest.raises(RuntimeError, match="Existing indexed corpus was preserved"):
+            service.ingest(mode="full")
+
+    assert qdrant.drop_collection_calls == 0
