@@ -10,6 +10,7 @@ class FakeQdrantGateway:
     def __init__(self, should_skip: bool = False, has_existing_points: bool = False) -> None:
         self.should_skip = should_skip
         self.has_existing_points = has_existing_points
+        self.drop_collection_calls = 0
         self.ensure_calls = 0
         self.delete_calls = 0
         self.upsert_calls = 0
@@ -19,6 +20,9 @@ class FakeQdrantGateway:
 
     def ensure_collection(self, collection_name: str, vector_size: int) -> None:
         self.ensure_calls += 1
+
+    def drop_collection_if_exists(self, collection_name: str) -> None:
+        self.drop_collection_calls += 1
 
     def delete_points_for_source_path(self, collection_name: str, source_path: str) -> None:
         self.delete_calls += 1
@@ -73,6 +77,7 @@ def test_ingest_incremental_skips_matching_file_hash(tmp_path) -> None:
     assert stats.files_unchanged == 1
     assert stats.files_not_indexable == 0
     assert stats.skipped_paths == ["corpus/a.cbl (unchanged file hash)"]
+    assert qdrant.drop_collection_calls == 0
     assert qdrant.upsert_calls == 0
 
 
@@ -108,6 +113,7 @@ def test_ingest_full_indexes_chunks_and_creates_collection_once(tmp_path) -> Non
     assert stats.files_unchanged == 0
     assert stats.files_not_indexable == 0
     assert stats.chunks_indexed == 2
+    assert qdrant.drop_collection_calls == 1
     assert qdrant.ensure_calls == 1
     assert qdrant.delete_calls == 2
     assert qdrant.upsert_calls == 2
@@ -133,6 +139,7 @@ def test_ingest_skips_when_no_chunks_emitted(tmp_path) -> None:
     assert stats.files_unchanged == 0
     assert stats.files_not_indexable == 1
     assert stats.skipped_paths == ["corpus/a.cbl (no indexable content)"]
+    assert qdrant.drop_collection_calls == 1
     assert qdrant.ensure_calls == 0
     assert qdrant.delete_calls == 0
 
@@ -157,4 +164,5 @@ def test_ingest_deletes_stale_points_when_no_chunks_emitted(tmp_path) -> None:
     assert stats.files_unchanged == 0
     assert stats.files_not_indexable == 1
     assert stats.skipped_paths == ["corpus/a.cbl (no indexable content)"]
+    assert qdrant.drop_collection_calls == 1
     assert qdrant.delete_calls == 1

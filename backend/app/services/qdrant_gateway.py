@@ -33,6 +33,12 @@ class QdrantGateway:
         )
         self._raise_for_error(create_response, "create collection")
 
+    def drop_collection_if_exists(self, collection_name: str) -> None:
+        response = self._client.delete(f"/collections/{collection_name}")
+        if response.status_code == 404:
+            return
+        self._raise_for_error(response, "drop collection")
+
     def has_matching_file_hash(self, collection_name: str, source_path: str, file_hash: str) -> bool:
         payload = self._scroll_one_by_path(collection_name, source_path)
         if payload is None:

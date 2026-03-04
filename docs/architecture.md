@@ -31,8 +31,9 @@ Corpus source of truth is GnuCOBOL SourceForge trunk:
 4. Embedding generation:
 - OpenAI embeddings when key exists
 - deterministic local fallback when key is absent
-5. Upsert points into Qdrant.
-6. Incremental mode skips unchanged files via hash match.
+5. Full ingest path drops the collection first to remove stale vectors.
+6. Upsert points into Qdrant.
+7. Incremental mode skips unchanged files via hash match.
 
 Configured corpus path is a single directory:
 

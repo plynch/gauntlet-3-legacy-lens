@@ -47,6 +47,11 @@ class IngestionService:
             collection_ready = False
             indexed_at = started_at.isoformat()
 
+            if mode == "full":
+                # Full ingest should represent the current source tree only.
+                # Dropping stale vectors prevents old corpora from polluting retrieval.
+                self._qdrant.drop_collection_if_exists(self._settings.qdrant_collection)
+
             for path in files:
                 indexed_chunks, file_bytes, file_loc, skip_reason = self._ingest_file(
                     path=path, mode=mode, collection_ready=collection_ready, indexed_at=indexed_at
