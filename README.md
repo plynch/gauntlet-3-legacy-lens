@@ -11,6 +11,11 @@ Primary corpus: [GnuCOBOL SourceForge trunk](https://sourceforge.net/p/gnucobol/
 3. Staging frontend: [https://legacy-lens-staging.up.railway.app/](https://legacy-lens-staging.up.railway.app/)
 4. Staging API: [https://legacy-lens-api-staging.up.railway.app/api/health](https://legacy-lens-api-staging.up.railway.app/api/health)
 
+## Demo Videos
+
+1. MVP demo submission: [https://www.youtube.com/watch?v=SoYmpzqxb0g](https://www.youtube.com/watch?v=SoYmpzqxb0g)
+2. Final demo submission: `TBD (to be added after recording today)`
+
 ## Key Documentation
 
 1. [Architecture](docs/architecture.md)
@@ -162,6 +167,9 @@ are configured on the API service, traces appear in Langfuse under:
 1. Railway `staging` tracks `main`.
 2. Railway `production` tracks `production`.
 3. Promote only after manual staging smoke checks pass.
+4. Recommended cost-safe ops mode:
+- staging keeps ingest controls enabled
+- production disables ingest controls and uses scheduled ingest jobs
 
 Detailed steps: `docs/railway-runbook.md`.
 

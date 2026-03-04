@@ -62,6 +62,12 @@ Frontend service:
 ```env
 VITE_API_BASE_URL=https://<api-domain>
 VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk
+VITE_ENABLE_INGEST_CONTROLS=false
+```
+
+Staging override:
+
+```env
 VITE_ENABLE_INGEST_CONTROLS=true
 ```
 
@@ -94,3 +100,39 @@ VITE_ENABLE_INGEST_CONTROLS=true
 2. Staging deploys automatically from `main` via Railway.
 3. Production deploys automatically from `production` via Railway.
 4. No GitHub Actions workflows are required for deployment in this project.
+
+## Scheduled Ingest Pattern (Recommended Post-MVP)
+
+Goal:
+
+1. Keep production query-only for users.
+2. Run indexing on a schedule to control cost and reduce accidental reindexes.
+
+Recommended policy:
+
+1. Staging:
+- Keep `VITE_ENABLE_INGEST_CONTROLS=true`.
+- Use interactive ingest buttons for testing and validation.
+2. Production:
+- Set `VITE_ENABLE_INGEST_CONTROLS=false`.
+- Trigger ingest via scheduled jobs only.
+
+Railway cron jobs:
+
+1. Create a small cron-trigger service in the same Railway environment.
+2. Use Railway Cron Jobs scheduling:
+- docs: https://docs.railway.com/reference/cron-jobs
+3. Start command examples:
+- Incremental ingest (daily):
+```bash
+python -c "import urllib.request; req=urllib.request.Request('https://legacy-lens-api.up.railway.app/api/ingest?mode=incremental', data=b'', method='POST'); print(urllib.request.urlopen(req, timeout=1800).status)"
+```
+- Full sync + ingest (weekly maintenance window):
+```bash
+python -c "import urllib.request; req=urllib.request.Request('https://legacy-lens-api.up.railway.app/api/corpus/sourceforge/full-ingest', data=b'', method='POST'); print(urllib.request.urlopen(req, timeout=3600).status)"
+```
+
+Operational note:
+
+1. Prefer incremental daily + full weekly.
+2. Monitor `GET /api/ingest/status` and Langfuse traces after each scheduled run.

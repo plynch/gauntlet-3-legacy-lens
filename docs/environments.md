@@ -37,8 +37,10 @@ LEGACYLENS_SOURCE_DIRECTORIES=["data/corpus/sourceforge-trunk"]
 # Frontend service
 VITE_API_BASE_URL=https://legacy-lens-api.up.railway.app
 VITE_SOURCE_REPO_BASE_URL=https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk
-VITE_ENABLE_INGEST_CONTROLS=true
+VITE_ENABLE_INGEST_CONTROLS=false
 ```
+
+Recommended: keep ingest buttons enabled in staging and disabled in production.
 
 ## Update Rule
 
