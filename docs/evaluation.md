@@ -19,7 +19,7 @@ Local API:
 python3 scripts/eval/run_eval.py \
   --api-base http://localhost:8000 \
   --queries scripts/eval/queries.sample.json \
-  --output-markdown docs/evaluation-results.md
+  --output-markdown docs/evaluation-results-local.md
 ```
 
 Staging API:
@@ -49,18 +49,17 @@ curl https://legacy-lens-api.up.railway.app/api/health
 
 ## Output
 
-`docs/evaluation-results.md` (whatever you specify after --output-markdown) includes:
+The output file (whatever you specify after `--output-markdown`) includes:
 
 1. p50 and p95 latency.
 2. Mean precision@5.
 3. Citation match rate.
 4. Per-query breakdown table.
 
-For live MVP demos, `docs/evaluation-results.md` also records:
+Canonical committed evaluation outputs for this project:
 
-1. Staging and production health check evidence.
-2. Full-corpus ingest evidence (files, chunks, LOC, duration).
-3. Representative query API evidence with citation paths.
+1. `docs/evaluation-results-staging.md`
+2. `docs/evaluation-results-production.md`
 
 ## Query Spec Format
 

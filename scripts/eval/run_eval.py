@@ -17,7 +17,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-markdown",
-        default="docs/evaluation-results.md",
+        default="docs/evaluation-results-local.md",
         help="Where to write markdown report",
     )
     args = parser.parse_args()
