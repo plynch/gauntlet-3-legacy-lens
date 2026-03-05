@@ -47,7 +47,7 @@ Why this strategy:
 
 ## Chunking Strategy
 
-Decision: custom syntax-aware COBOL chunking with overlap fallback.
+Decision: COBOL-aware section chunking plus generic line-window fallback for non-COBOL files.
 
 Implementation:
 
@@ -55,6 +55,7 @@ Implementation:
 2. Segment file by detected anchors.
 3. If segment length <= `chunk_max_lines` (default `80`), emit one chunk.
 4. If segment exceeds max size, emit overlapping windows (`chunk_overlap_lines`, default `16`).
+5. If no COBOL anchors are found (common for C/C headers), chunk as overlapping fixed line windows.
 
 Metadata captured per chunk:
 
@@ -67,8 +68,13 @@ Metadata captured per chunk:
 Why:
 
 1. COBOL section boundaries are natural semantic units.
-2. Overlap reduces boundary loss for long sections.
+2. Line-window fallback keeps mixed-language corpus ingest robust under deadline.
 3. Line-level metadata supports citation correctness requirements.
+
+Current limitation:
+
+1. C files are not yet function/AST-aware chunked; they use the line-window fallback.
+2. Planned improvement after submission: extension-routed chunkers (for example C function-level chunking) while keeping this fallback for unknown file types.
 
 ## Retrieval Strategy
 

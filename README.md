@@ -71,7 +71,7 @@ Expected upstream size (latest trunk snapshot during development):
 ## How It Works
 
 1. Sync SourceForge trunk into local/runtime corpus directory.
-2. Chunk source files with section-aware boundaries and overlap fallback.
+2. Chunk source files with COBOL section anchors when present; otherwise use overlapping line-window fallback (used for most C files).
 3. Embed chunks and store vectors + metadata in Qdrant.
 4. On query, embed question, retrieve top-k chunks, generate grounded answer.
 5. Return answer + citations + evidence snippets.
@@ -215,6 +215,6 @@ npm run build
 
 ## Known Limits
 
-1. Retrieval quality depends on chunking and embedding model behavior on mixed source/code assets.
+1. C and non-COBOL files currently use overlapping line-window fallback chunking, not function/AST-aware chunking yet.
 2. Incremental indexing marks unchanged files as `unchanged` by design (not a failure).
 3. Some files may be reported as `not indexable` when they are effectively blank or cannot produce chunks; this is informational.

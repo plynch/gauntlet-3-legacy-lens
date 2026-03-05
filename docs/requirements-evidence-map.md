@@ -7,7 +7,7 @@ This maps each stated MVP hard-gate requirement to concrete evidence in the repo
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | Ingest at least one legacy codebase | met | Source corpus is [GnuCOBOL SourceForge trunk](https://sourceforge.net/p/gnucobol/code/HEAD/tree/trunk/); ingest metrics in `docs/ingest-benchmarks.md`. |
-| Chunk code files with syntax-aware splitting | met | COBOL chunking pipeline in `backend/app/services/cobol_chunker.py`; final architecture notes in `docs/rag-architecture-final.md`. |
+| Chunk code files with syntax-aware splitting | met | COBOL section-aware chunking when anchors exist, plus overlapping line-window fallback for non-COBOL files (`backend/app/services/cobol_chunker.py`; details in `docs/rag-architecture-final.md`). |
 | Generate embeddings for all chunks | met | Ingest stats show non-zero chunk counts (`8929`) after full ingest in staging/production (`docs/evaluation-results-staging.md`, `docs/evaluation-results-production.md`). |
 | Store embeddings in a vector database | met | Qdrant gateway implementation in `backend/app/services/qdrant_gateway.py`; health shows Qdrant configured. |
 | Implement semantic search across codebase | met | `POST /api/query` returns ranked evidence snippets and citations; sample results in `docs/evaluation-results-staging.md` and `docs/evaluation-results-production.md`. |
