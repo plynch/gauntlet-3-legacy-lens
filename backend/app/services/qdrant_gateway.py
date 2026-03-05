@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime, timezone
 
 import httpx
 
@@ -59,6 +60,41 @@ class QdrantGateway:
         data = response.json()
         count = int(data.get("result", {}).get("count", 0))
         return count > 0
+
+    def get_latest_indexed_at(self, collection_name: str) -> datetime | None:
+        latest: datetime | None = None
+        offset: str | int | None = None
+
+        while True:
+            request_body: dict[str, object] = {
+                "limit": 256,
+                "with_payload": True,
+                "with_vector": False,
+            }
+            if offset is not None:
+                request_body["offset"] = offset
+
+            response = self._client.post(f"/collections/{collection_name}/points/scroll", json=request_body)
+            if response.status_code == 404:
+                return None
+            self._raise_for_error(response, "scroll points for latest indexed_at")
+
+            result = response.json().get("result", {})
+            points = result.get("points", [])
+            for point in points:
+                payload = point.get("payload", {})
+                indexed_at = payload.get("indexed_at")
+                if not indexed_at:
+                    continue
+                parsed = _parse_qdrant_indexed_at(str(indexed_at))
+                if parsed is None:
+                    continue
+                if latest is None or parsed > latest:
+                    latest = parsed
+
+            offset = result.get("next_page_offset")
+            if offset is None:
+                return latest
 
     def delete_points_for_source_path(self, collection_name: str, source_path: str) -> None:
         response = self._client.post(
@@ -150,3 +186,13 @@ def chunk_payload(chunk: SourceChunk, indexed_at: str | None = None) -> dict[str
         "section": chunk.section,
         "indexed_at": indexed_at,
     }
+
+
+def _parse_qdrant_indexed_at(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)

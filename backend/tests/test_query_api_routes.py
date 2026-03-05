@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
@@ -10,6 +9,12 @@ from app.models.corpus import SourceForgeSyncStats
 from app.models.ingest import IngestStats
 from app.models.query import Citation, QueryResponse, RetrievedSnippet
 from app.services.ingest_status_store import IngestStatusStore
+from tests.test_support.query_api_fakes import (
+    FakeIngestionService,
+    FakeQueryService,
+    FakeStatusQdrantGateway,
+    make_runtime_services,
+)
 
 client = TestClient(app)
 
@@ -19,25 +24,7 @@ def reset_ingest_status_store(monkeypatch):
     monkeypatch.setattr(query_api, "ingest_status_store", IngestStatusStore())
 
 
-class FakeQueryService:
-    def __init__(self, response: QueryResponse) -> None:
-        self._response = response
-
-    def answer(self, question: str, top_k: int | None = None) -> QueryResponse:
-        return self._response
-
-
-class FakeIngestionService:
-    def __init__(self, stats: IngestStats) -> None:
-        self._stats = stats
-
-    def ingest(self, mode: str = "incremental") -> IngestStats:
-        return self._stats
-
-
-@contextmanager
-def fake_runtime_services(_settings: object):
-    yield type("Runtime", (), {"settings": query_api.settings, "qdrant": object(), "openai_gateway": object()})()
+fake_runtime_services = make_runtime_services(query_api.settings)
 
 
 def test_post_query_route_returns_contract(monkeypatch) -> None:
@@ -161,6 +148,39 @@ def test_get_ingest_status_route_returns_snapshot() -> None:
     assert payload["phase"] == "completed"
     assert payload["active"] is False
     assert payload["ingest_stats"]["chunks_indexed"] == 11
+
+
+def test_get_ingest_status_recovers_last_indexed_at_from_qdrant(monkeypatch) -> None:
+    monkeypatch.setattr(query_api.settings, "ingest_benchmark_log_path", "/tmp/legacylens-missing-log.jsonl")
+    latest_indexed_at = datetime(2026, 3, 4, 23, 14, 28, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        query_api,
+        "runtime_services",
+        make_runtime_services(query_api.settings, FakeStatusQdrantGateway(latest_indexed_at=latest_indexed_at)),
+    )
+
+    response = client.get("/api/ingest/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["has_indexed_data"] is True
+    assert payload["last_indexed_at"] == "2026-03-04T23:14:28Z"
+
+
+def test_get_ingest_status_marks_indexed_data_without_timestamp(monkeypatch) -> None:
+    monkeypatch.setattr(query_api.settings, "ingest_benchmark_log_path", "/tmp/legacylens-missing-log.jsonl")
+    monkeypatch.setattr(
+        query_api,
+        "runtime_services",
+        make_runtime_services(query_api.settings, FakeStatusQdrantGateway(latest_indexed_at=None, has_any_points=True)),
+    )
+
+    response = client.get("/api/ingest/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["has_indexed_data"] is True
+    assert payload["last_indexed_at"] is None
 
 
 def test_sync_sourceforge_route_returns_stats(monkeypatch) -> None:

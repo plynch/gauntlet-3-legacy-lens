@@ -80,11 +80,13 @@ class IngestStatusStore:
             if summary is not None:
                 self._status.summary = summary
 
-    def mark_indexed_data_detected(self) -> None:
+    def mark_indexed_data_detected(self, last_indexed_at: datetime | None = None) -> None:
         with self._lock:
-            if self._status.has_indexed_data:
+            if self._status.has_indexed_data and (self._status.last_indexed_at is not None or last_indexed_at is None):
                 return
             self._status.has_indexed_data = True
+            if self._status.last_indexed_at is None and last_indexed_at is not None:
+                self._status.last_indexed_at = last_indexed_at
             self._status.updated_at = _utc_now()
 
     def mark_failed(self, *, error: str, stage: ErrorStage, summary: str | None = None) -> None:

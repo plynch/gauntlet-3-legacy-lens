@@ -76,16 +76,19 @@ def get_ingest_runs(limit: int | None = None) -> list[IngestStats]:
 @router.get("/ingest/status", response_model=IngestStatus)
 def get_ingest_status() -> IngestStatus:
     status = ingest_status_store.snapshot(benchmark_log_path=settings.ingest_benchmark_log_path)
-    if status.has_indexed_data:
+    if status.active or status.last_indexed_at is not None:
         return status
 
     # Fallback for deployments where local benchmark logs are ephemeral:
-    # detect previously indexed corpus directly from Qdrant persistence.
+    # recover index presence and latest indexed timestamp directly from Qdrant.
     try:
         with runtime_services(settings) as services:
-            if services.qdrant.has_any_points(settings.qdrant_collection):
+            latest_indexed_at = services.qdrant.get_latest_indexed_at(settings.qdrant_collection)
+            if latest_indexed_at is not None:
+                ingest_status_store.mark_indexed_data_detected(last_indexed_at=latest_indexed_at)
+            elif services.qdrant.has_any_points(settings.qdrant_collection):
                 ingest_status_store.mark_indexed_data_detected()
-                status = ingest_status_store.snapshot(benchmark_log_path=settings.ingest_benchmark_log_path)
+            status = ingest_status_store.snapshot(benchmark_log_path=settings.ingest_benchmark_log_path)
     except Exception:
         # Keep status endpoint resilient even if Qdrant is transiently unavailable.
         pass
